@@ -1,0 +1,4661 @@
+<roblox version="4">
+  <Item class="ReplicatedStorage" referent="0">
+    <Properties>
+      <string name="Name">ReplicatedStorage</string>
+    </Properties>
+    <Item class="Folder" referent="1">
+      <Properties>
+        <string name="Name">Shared</string>
+      </Properties>
+      <Item class="ModuleScript" referent="2">
+        <Properties>
+          <string name="Name">Config</string>
+          <string name="Source"><![CDATA[--!strict
+-- Все числа игры в одном месте.
+--
+-- Правило проекта: ни одно из этих значений не должно появиться в коде
+-- напрямую. Баланс настраивается живыми игроками, и правка должна быть
+-- одной цифрой здесь, а не поиском по файлам.
+--
+-- Тексты, которые видит игрок, — на английском: игра англоязычная,
+-- остальные языки закрывает автоперевод Roblox.
+
+local Types = require(script.Parent.Types)
+
+local Config = {}
+
+-- ─────────────────────────────────────────────────────────────
+-- Игра
+-- ─────────────────────────────────────────────────────────────
+
+Config.GameName = "Baggage Rush"
+Config.Version = "0.1.0"
+
+-- ─────────────────────────────────────────────────────────────
+-- Лента
+-- ─────────────────────────────────────────────────────────────
+
+-- Секунд на путь чемодана от начала ленты до конца.
+--
+-- Главная ручка темпа игры: чем больше, тем больше времени на решение
+-- по каждому чемодану. Двенадцати не хватало — игра шла так бодро,
+-- что не успеваешь понять, что происходит.
+Config.BeltTravelSeconds = 16
+
+-- Промежуток между приходами пассажиров. Чемоданы появляются только
+-- вместе с ними, поэтому это и есть главная ручка темпа.
+Config.PassengerInterval = 1.8
+
+-- Минимальная пауза между двумя чемоданами на ленте.
+--
+-- Без неё быстрый игрок освобождает ленту, несколько пассажиров кладут
+-- багаж почти одновременно, и чемоданы слипаются в одной точке.
+-- При длине ленты 60 и пути 12 секунд лента идёт со скоростью 5 единиц
+-- в секунду, так что 1.2 секунды дают просвет около шести единиц.
+Config.MinBagGapSeconds = 1.2
+
+-- Сколько чемоданов лента старается держать на себе.
+--
+-- Пассажиры не выходят, если лента уже загружена: иначе очередь растёт
+-- бесконечно, а чемодану некуда встать. И наоборот — разобрал быстро,
+-- пришёл следующий. Давление держится само.
+Config.TargetBagsOnBelt = 4
+
+-- Сколько чемоданов может ехать одновременно.
+Config.BeltCapacity = 8
+
+-- Доехавший до конца чемодан не пропадает, а встаёт в очередь.
+--
+-- Иначе игра наказывала бы за отвлечение на рамку: две её собственные
+-- задачи дрались бы между собой. С очередью провал двухступенчатый —
+-- сначала видно, что отстаёшь, и только при переполнении идут потери.
+Config.QueueCapacity = 6
+
+-- Куда складывается очередь и с каким шагом.
+Config.QueueStart = Vector3.new(34, 4, 0)
+Config.QueueStep = Vector3.new(4, 0, 0)
+
+-- Геометрия ленты. Держим здесь, чтобы сервер и клиент считали
+-- положение чемодана по одним и тем же точкам.
+Config.BeltStart = Vector3.new(-30, 4, 0)
+Config.BeltEnd = Vector3.new(30, 4, 0)
+Config.BeltWidth = 8
+Config.BagSize = Vector3.new(3, 2, 4)
+
+-- ─────────────────────────────────────────────────────────────
+-- Плоты
+-- ─────────────────────────────────────────────────────────────
+
+-- Восемь мест на карте, по одному на игрока. Все координаты ниже —
+-- смещения от начала плота, а не мировые точки: иначе восемь аэропортов
+-- построились бы друг на друге.
+Config.PlotCount = 8
+Config.PlotSize = Vector3.new(400, 300)
+Config.PlotColumns = 4
+
+-- Промежутки между плотами: по ним идут тропинки, и в них же уходит
+-- запас на будущее расширение аэропорта.
+-- Промежуток заполняется тропинкой целиком, поэтому отдельной ширины
+-- у неё нет: иначе по краям остаются провалы до общей земли.
+Config.PlotGap = Vector3.new(70, 90)
+
+-- Ворота захвата стоят у входа на плот. Свободные пускают и выдают
+-- базу, занятые пропускают в гости, но управление там не работает.
+Config.ClaimGateOffset = Vector3.new(-185, 3, -12)
+Config.ClaimGateSize = Vector3.new(4, 12, 20)
+
+-- ─────────────────────────────────────────────────────────────
+-- Улица и парковка
+-- ─────────────────────────────────────────────────────────────
+
+-- Такси подъезжает, пассажир выходит и идёт в здание. Улица и парковка —
+-- ещё одна зона под декор, а заодно объяснение, откуда берутся люди.
+Config.TaxiStopOffset = Vector3.new(-140, 3, -12)
+Config.TaxiSpawnOffset = Vector3.new(-190, 3, -12)
+Config.TaxiSize = Vector3.new(12, 5, 6)
+Config.TaxiColor = Color3.fromRGB(226, 186, 62)
+Config.TaxiSpeed = 34
+
+Config.StreetCenterOffset = Vector3.new(-140, 3, -12)
+Config.StreetSize = Vector3.new(90, 40)
+
+-- ─────────────────────────────────────────────────────────────
+-- Зал и путь пассажира
+-- ─────────────────────────────────────────────────────────────
+
+-- Всё происходит внутри одного здания: зал, пункт досмотра, лента,
+-- жёлоба и будка охраны. Крыши нет намеренно — иначе камера сверху
+-- ничего не увидит; для Roblox это обычное решение.
+Config.BuildingCenter = Vector3.new(-20, 3, -12)
+Config.BuildingSize = Vector3.new(154, 64)
+Config.WallHeight = 16
+
+-- Проёмы: вход со стороны улицы, выход с противоположной.
+Config.EntryDoorWidth = 14
+Config.ExitDoorWidth = 14
+
+-- Вывеска над входом. По умолчанию берёт ник игрока, но её можно
+-- будет сменить на любую надпись.
+Config.SignSuffix = " AIRPORT"
+
+-- Готовые места под декор. Игрок не расставляет свободно — он покупает
+-- предмет, и тот встаёт в отведённую точку. Так проще и предсказуемее,
+-- а свободную расстановку можно добавить позже, не ломая сохранения.
+Config.DecorSlots = {
+	Vector3.new(-84, 3, -22),
+	Vector3.new(-72, 3, -22),
+	Vector3.new(-60, 3, -22),
+	Vector3.new(-84, 3, -2),
+	Vector3.new(-72, 3, -2),
+	Vector3.new(-60, 3, -2),
+}
+
+-- Пассажир входит, кладёт чемодан на ленту, проходит через рамку
+-- и уходит. Чемоданы больше не возникают сами: у каждого есть хозяин.
+Config.PassengerEntry = Vector3.new(-88, 3, -12)
+Config.PassengerDropPoint = Vector3.new(-30, 3, -7)
+Config.PassengerFramePoint = Vector3.new(0, 3, -12)
+Config.PassengerExit = Vector3.new(44, 3, -14)
+
+-- Скорость шага в единицах в секунду.
+--
+-- Поднята вместе с одноместным проходом: пока человек идёт от ленты
+-- к рамке, следующий стоит в очереди, и медленный шаг оставлял бы
+-- ленту голодной.
+Config.PassengerSpeed = 17
+
+-- Очередь перед приёмкой. Когда лента загружена, пассажиры не исчезают,
+-- а встают в хвост: спрос должен быть виден. Растущая очередь говорит
+-- «не справляешься» понятнее любой надписи.
+Config.LineStart = Vector3.new(-38, 3, -7)
+-- Шаг плотный: люди должны стоять очередью, а не редкой цепочкой
+-- через полкарты. Раньше восемь человек растягивались на 36 единиц.
+Config.LineStep = Vector3.new(-3.2, 0, 0)
+Config.LineCapacity = 6
+
+-- Зона ожидания за рамкой: здесь пассажир ждёт свой чемодан.
+-- Без неё люди уходили сразу, бросая багаж, и потеря чемодана
+-- оставалась абстрактной прибавкой к счётчику.
+-- Ждущие стоят компактной группой в два ряда, а не длинной шеренгой.
+Config.WaitStart = Vector3.new(16, 3, -20)
+Config.WaitStep = Vector3.new(3.4, 0, 0)
+Config.WaitRowStep = Vector3.new(0, 0, -3.4)
+Config.WaitPerRow = 3
+
+-- Потолок зоны ожидания. Без него толпа росла без предела: если игрок
+-- отстаёт, люди копятся и загромождают весь пункт. Не дождавшийся
+-- уходит расстроенным — как в жизни.
+Config.WaitCapacity = 6
+
+-- Рамка стоит посередине пункта, лента сбоку.
+Config.FramePosition = Vector3.new(0, 3, -12)
+
+-- ─────────────────────────────────────────────────────────────
+-- Досмотр
+-- ─────────────────────────────────────────────────────────────
+
+-- Доля пассажиров, которых следует досмотреть.
+Config.SuspiciousChance = 0.25
+
+-- Какая часть подозрительных звенит на рамке.
+--
+-- Смешанный режим намеренный: если бы звенели все, игрок ждал бы
+-- звука и не смотрел на людей. Звенящий останавливается сам и никуда
+-- не денется, а молчащий идёт к выходу — вот он и есть работа.
+Config.BeepChance = 0.6
+
+-- Сколько звенящий ждёт досмотра, прежде чем плюнуть и уйти.
+--
+-- Предохранитель против тупика: он перекрывает проход, и если игрок
+-- не заметит красную рамку, игра встала бы навсегда. Уход засчитывается
+-- как ускользнувший — давление остаётся, безвыходность уходит.
+Config.SearchPatienceSeconds = 20
+
+-- Сколько секунд идёт проверка. Это время лента едет без присмотра,
+-- поэтому цена досмотра — не штраф, а упущенный багаж.
+Config.SearchSeconds = 3
+
+-- ─────────────────────────────────────────────────────────────
+-- Ручная кладь
+-- ─────────────────────────────────────────────────────────────
+
+-- Сколько вещей показываем при досмотре.
+Config.ItemsPerCheck = 3
+
+-- Что нельзя провозить. Это второй растущий свод правил: со ступенями
+-- список будет пополняться, и наставник будет его показывать.
+local prohibited: { Types.ItemKind } = { "Knife", "Liquid", "Lighter" }
+Config.ProhibitedItems = prohibited
+
+local allItems: { Types.ItemKind } = { "Clothes", "Book", "Phone", "Knife", "Liquid", "Lighter" }
+Config.AllItems = allItems
+
+-- Вещи различаются цветом и формой, не подписью: аудитория многоязычная.
+Config.ItemColors = {
+	Clothes = Color3.fromRGB(120, 170, 210),
+	Book = Color3.fromRGB(150, 130, 200),
+	Phone = Color3.fromRGB(110, 200, 180),
+	Knife = Color3.fromRGB(220, 90, 80),
+	Liquid = Color3.fromRGB(230, 150, 70),
+	Lighter = Color3.fromRGB(215, 110, 150),
+}
+
+-- Насколько часто у отмеченного пассажира действительно есть запрещённое.
+--
+-- Меньше единицы намеренно: отметка означает «проверь», а не «виновен».
+-- Иначе досмотр свёлся бы к «заметил и нажал», без всякого решения.
+Config.GuiltyChance = 0.6
+
+-- Сколько обычный пассажир стоит в рамке, проходя её.
+--
+-- Тормозят все, а не только звенящие: иначе молчащего подозрительного
+-- нельзя было бы досмотреть вовсе, и оттенок терял бы смысл. Это окно —
+-- шанс поймать того, кого рамка не поймала.
+--
+-- Полутора секунд не хватало: если игрок в этот момент разбирал чемодан,
+-- шанса не было физически, и игра наказывала за собственную же вторую
+-- задачу.
+Config.FramePauseSeconds = 2.5
+
+-- ─────────────────────────────────────────────────────────────
+-- Охрана
+-- ─────────────────────────────────────────────────────────────
+
+-- Двое стоят у рамки и уводят задержанных в будку.
+Config.GuardPosts = {
+	Vector3.new(-9, 3, -20),
+	Vector3.new(9, 3, -20),
+}
+Config.GuardBooth = Vector3.new(0, 3, -34)
+Config.GuardColor = Color3.fromRGB(70, 110, 200)
+Config.GuardSpeed = 18
+
+-- Цвета состояний пассажира.
+Config.PassengerCalmColor = Color3.fromRGB(196, 196, 204)
+-- Молчащий подозрительный отличается оттенком: заметно, но не кричаще.
+Config.PassengerSuspectColor = Color3.fromRGB(150, 146, 168)
+Config.PassengerHappyColor = Color3.fromRGB(150, 220, 160)
+Config.PassengerUpsetColor = Color3.fromRGB(226, 120, 110)
+-- Три состояния рамки. Зелёная и красная показывают вердикт сканера,
+-- а не истину: у части красных ничего запрещённого нет, а часть тихих
+-- провозит. Иначе досмотр был бы не нужен — хватило бы взгляда на цвет.
+Config.FrameIdleColor = Color3.fromRGB(158, 164, 172)
+Config.FrameClearColor = Color3.fromRGB(96, 186, 120)
+Config.FrameAlertColor = Color3.fromRGB(228, 96, 84)
+
+-- Цвета бирок. Ключи совпадают с Types.Destination.
+Config.DestinationColors = {
+	Red = Color3.fromRGB(196, 62, 48),
+	Blue = Color3.fromRGB(48, 108, 196),
+	Green = Color3.fromRGB(62, 152, 82),
+	Yellow = Color3.fromRGB(214, 176, 48),
+}
+
+Config.VipColor = Color3.fromRGB(232, 190, 72)
+
+-- ─────────────────────────────────────────────────────────────
+-- Какие чемоданы приезжают
+-- ─────────────────────────────────────────────────────────────
+
+-- Аннотация на локальной переменной, а не приведение через `::`:
+-- иначе Luau выводит элементы как обычные строки и теряет перечисление.
+local destinations: { Types.Destination } = { "Red", "Blue", "Green", "Yellow" }
+Config.Destinations = destinations
+
+-- Доли особых чемоданов. Применяются только с той ступени,
+-- на которой соответствующее правило открыто.
+Config.OversizedChance = 0.15
+Config.FragileChance = 0.12
+Config.FlaggedChance = 0.10
+
+-- VIP-гость с золотым чемоданом. Заметен глазом и платит больше —
+-- ради него покупают бустер.
+Config.VipChance = 0.05
+
+-- ─────────────────────────────────────────────────────────────
+-- Оплата
+-- ─────────────────────────────────────────────────────────────
+
+Config.BasePayPerBag = 10
+
+-- Во сколько раз золотой чемодан дороже обычного.
+Config.VipPayMultiplier = 5
+
+-- Штраф за ошибку: доля от стоимости чемодана. Единица означает
+-- «потерял ровно то, что заработал бы».
+--
+-- Баланс никогда не уходит ниже нуля: наказание должно раздражать,
+-- а не разорять.
+Config.MisSortPenalty = 1.0
+
+-- ─────────────────────────────────────────────────────────────
+-- Кривая стоимости
+-- ─────────────────────────────────────────────────────────────
+
+-- Цена покупки номер n = BaseCost * CostGrowth ^ (n - 1).
+--
+-- Смысл коэффициента — держать время до следующей покупки примерно
+-- постоянным. Тогда у игрока всё время есть ощущение «почти накопил».
+-- Для симуляторов обычный диапазон 1.15…1.35.
+--
+-- При 1.2 третья покупка случалась за те же пять минут, что отведены
+-- на первую, а всё дерево выкупалось за полчаса. Поднято ближе к
+-- верхней границе: первая покупка остаётся быстрой, дальше растягивается.
+Config.CostGrowth = 1.32
+
+-- ─────────────────────────────────────────────────────────────
+-- Доход в отсутствие игрока
+-- ─────────────────────────────────────────────────────────────
+
+-- Какую долю от активной игры даёт автоматика.
+-- Выше — перестанут играть руками, ниже — не станут возвращаться.
+Config.OfflineRate = 0.25
+
+-- Потолок накопления, секунды. Восемь часов делают оптимальным
+-- заход примерно раз в день — ровно та метрика, по которой нас ранжируют.
+-- Больше — развалится суточная петля, меньше — обидно за пропущенное.
+Config.BacklogCapSeconds = 8 * 60 * 60
+
+-- Надбавка за разбор завала. Ниже — незачем разгребать,
+-- выше — выгоднее не играть.
+Config.BacklogPayMultiplier = 1.5
+
+-- ─────────────────────────────────────────────────────────────
+-- Ступени правил
+-- ─────────────────────────────────────────────────────────────
+
+-- Открываются по уровню игрока, а не по общему таймеру: на постоянном
+-- сервере Roblox игроки заходят в разное время, и общий отсчёт рассыпается.
+Config.Tiers = {
+	{ tier = 1, unlockAtBags = 0, rule = "Destination colour" },
+	{ tier = 2, unlockAtBags = 40, rule = "Oversized goes to its own chute" },
+	{ tier = 3, unlockAtBags = 120, rule = "Fragile must not ride the main belt" },
+	{ tier = 4, unlockAtBags = 260, rule = "Flagged bags go to security" },
+}
+
+Config.MaxTier = 4
+
+-- ─────────────────────────────────────────────────────────────
+-- Обучение
+-- ─────────────────────────────────────────────────────────────
+
+-- Сколько чемоданов ведём стрелкой. После этого игрок работает сам.
+Config.TutorialGuidedBags = 4
+
+-- Во время обучения лента идёт медленнее.
+Config.TutorialSpawnInterval = 6.0
+
+-- Ошибка в обучении показывает последствие, но не наказывает.
+Config.TutorialPenaltyEnabled = false
+
+-- ─────────────────────────────────────────────────────────────
+-- Апгрейды
+-- ─────────────────────────────────────────────────────────────
+
+-- Первая покупка обязана случиться в первые пять минут игры,
+-- поэтому стартовая цена намеренно низкая.
+-- Улучшения покупаются за деньги и действуют сразу.
+--
+-- Порядок цен задаёт порядок покупок, и первым должно идти то, что
+-- расшивает узкое место. Узкое место сейчас — сам досмотр: три секунды
+-- проверки плюс запертый проход. Поэтому Faster Check самый дешёвый,
+-- а Faster Lane, который наоборот усиливает поток, стоит дороже всех:
+-- его берут, когда уже справляешься.
+local upgrades: { Types.Upgrade } = {
+	{
+		id = "FastCheck",
+		displayName = "Fast Check",
+		baseCost = 80,
+		maxCount = 6,
+	},
+	{
+		id = "ExtraStorage",
+		displayName = "Extra Storage",
+		baseCost = 140,
+		maxCount = 6,
+	},
+	{
+		id = "BetterScanner",
+		displayName = "Better Scanner",
+		baseCost = 200,
+		maxCount = 5,
+	},
+	{
+		id = "FasterLane",
+		displayName = "Faster Lane",
+		baseCost = 260,
+		maxCount = 8,
+	},
+}
+Config.Upgrades = upgrades
+
+-- Что даёт одна ступень каждого улучшения.
+Config.UpgradeEffects = {
+	FastCheck = { checkCut = 0.3 },
+	ExtraStorage = { queueBonus = 1 },
+	BetterScanner = { beepBonus = 0.06 },
+	FasterLane = { speedBonus = 2.5, pauseCut = 0.08 },
+}
+
+-- Нижняя граница времени проверки: полностью убрать её нельзя,
+-- иначе досмотр перестанет чего-либо стоить.
+Config.MinSearchSeconds = 1.2
+
+return Config
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="3">
+        <Properties>
+          <string name="Name">PlotContext</string>
+          <string name="Source"><![CDATA[--!strict
+-- Начало плота, на котором работает этот клиент.
+--
+-- Координаты в Config — смещения, а не мировые точки. Этот модуль
+-- переводит их в мировые: `PlotContext.at(Config.BeltStart)`.
+--
+-- Раньше значение лежало в атрибуте Workspace и было одно на сервер.
+-- С восемью плотами так нельзя: у каждого своё начало. Теперь сервер
+-- присылает его владельцу вместе с состоянием аэропорта, а модуль
+-- просто хранит присланное.
+--
+-- На сервере не используется: там координаты берутся прямо из плота.
+
+local PlotContext = {}
+
+local origin: Vector3? = nil
+
+function PlotContext.set(value: Vector3?)
+	origin = value
+end
+
+function PlotContext.clear()
+	origin = nil
+end
+
+function PlotContext.origin(): Vector3
+	return origin or Vector3.zero
+end
+
+-- Смещение в мировую точку.
+function PlotContext.at(offset: Vector3): Vector3
+	return PlotContext.origin() + offset
+end
+
+-- Есть ли у клиента свой аэропорт. До захвата рисовать нечего.
+function PlotContext.isActive(): boolean
+	return origin ~= nil
+end
+
+return PlotContext
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="4">
+        <Properties>
+          <string name="Name">Remotes</string>
+          <string name="Source"><![CDATA[--!strict
+-- Каналы связи между сервером и клиентом.
+--
+-- Сервер создаёт канал при первом обращении, клиент его дожидается.
+-- Благодаря этому порядок запуска скриптов не важен.
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local FOLDER_NAME = "Remotes"
+
+local Remotes = {}
+
+-- Все каналы игры перечислены здесь, чтобы сервер мог создать их сразу
+-- при запуске.
+--
+-- Это не формальность: часть каналов создаётся внутри аэропорта, то есть
+-- только после захвата плота. Клиент же ждёт их при старте и без этого
+-- списка виснет на ожидании канала, которого ещё нет.
+local NAMES = {
+	"AirportState",
+	"BagDespawned",
+	"BagSpawned",
+	"BuyUpgrade",
+	"CheckDecision",
+	"CheckReady",
+	"CheckStarted",
+	"ClaimPlot",
+	"CodeResult",
+	"PlotListing",
+	"QueueUpdated",
+	"RedeemCode",
+	"RequestPlots",
+	"SecurityAlert",
+	"SecurityResult",
+	"SetAirportOpen",
+	"ShopChanged",
+	"SortResult",
+	"WalletChanged",
+}
+
+function Remotes.get(name: string): RemoteEvent
+	if RunService:IsServer() then
+		local folder = ReplicatedStorage:FindFirstChild(FOLDER_NAME)
+		if folder == nil then
+			local created = Instance.new("Folder")
+			created.Name = FOLDER_NAME
+			created.Parent = ReplicatedStorage
+			folder = created
+		end
+		assert(folder ~= nil, "remote folder missing")
+
+		local existing = folder:FindFirstChild(name)
+		if existing then
+			return existing :: RemoteEvent
+		end
+
+		local remote = Instance.new("RemoteEvent")
+		remote.Name = name
+		remote.Parent = folder
+		return remote
+	end
+
+	local folder = ReplicatedStorage:WaitForChild(FOLDER_NAME)
+	return folder:WaitForChild(name) :: RemoteEvent
+end
+
+-- Зовётся сервером один раз при запуске, до появления игроков.
+function Remotes.ensureAll()
+	for _, name in NAMES do
+		Remotes.get(name)
+	end
+end
+
+return Remotes
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="5">
+        <Properties>
+          <string name="Name">RuleSet</string>
+          <string name="Source"><![CDATA[--!strict
+-- Свод правил сортировки.
+--
+-- Один вопрос: в какой жёлоб должен уехать этот чемодан. Ответ зависит от
+-- ступени, до которой добрался игрок, — правила открываются по мере
+-- прокачки, а не по общему таймеру.
+--
+-- Модуль общий: сервер по нему судит, клиент по нему подсказывает
+-- в обучении. Судить при этом имеет право только сервер.
+
+local Types = require(script.Parent.Types)
+
+local RuleSet = {}
+
+-- Порядок проверок задаёт приоритет правил, и он важен.
+-- Чемодан может быть одновременно хрупким и негабаритным; выигрывает
+-- то правило, что выше. Досмотр перекрывает всё: подозрительный
+-- чемодан не летит никуда, пока его не проверили.
+function RuleSet.correctChute(bag: Types.Bag, tier: number): Types.ChuteId
+	if tier >= 4 and bag.flagged then
+		return "Security"
+	end
+	if tier >= 3 and bag.fragile then
+		return "Fragile"
+	end
+	if tier >= 2 and bag.size == "Oversized" then
+		return "Oversized"
+	end
+	return bag.destination
+end
+
+-- Какие жёлоба вообще открыты на этой ступени. Нужно, чтобы не строить
+-- в мире приёмники, о которых игрок ещё не знает.
+function RuleSet.chutesForTier(tier: number, destinations: { Types.Destination }): { Types.ChuteId }
+	local chutes: { Types.ChuteId } = {}
+	for _, destination in destinations do
+		table.insert(chutes, destination)
+	end
+	if tier >= 2 then
+		table.insert(chutes, "Oversized")
+	end
+	if tier >= 3 then
+		table.insert(chutes, "Fragile")
+	end
+	if tier >= 4 then
+		table.insert(chutes, "Security")
+	end
+	return chutes
+end
+
+return RuleSet
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="6">
+        <Properties>
+          <string name="Name">Types</string>
+          <string name="Source"><![CDATA[--!strict
+-- Формы данных, которыми обмениваются сервер и клиент.
+-- Модуль ничего не выполняет: он нужен, чтобы редактор и компилятор
+-- ловили ошибки до запуска игры.
+
+-- Куда летит чемодан. Это же значение служит цветом бирки.
+export type Destination = "Red" | "Blue" | "Green" | "Yellow"
+
+export type BagSize = "Normal" | "Oversized"
+
+-- Жёлоба: четыре по направлениям плюс три особых.
+export type ChuteId = Destination | "Oversized" | "Fragile" | "Security"
+
+-- Чемодан — это запись в очереди, а не физическая деталь.
+-- Сервер держит logicalPosition, клиент по нему рисует движение.
+export type Bag = {
+	id: string,
+	destination: Destination,
+	size: BagSize,
+	fragile: boolean,
+	flagged: boolean, -- нужен досмотр
+	isVip: boolean, -- золотой чемодан, платит больше
+	ownerId: string, -- кто его принёс: потеря должна иметь лицо
+	-- workspace:GetServerTimeNow() на момент появления. Часы синхронны
+	-- у сервера и клиентов, поэтому клиент вычисляет положение сам
+	-- и по сети не идёт ни одного пакета за кадр.
+	spawnedAt: number,
+}
+
+-- Вещи в ручной клади. Часть запрещена — какая именно, игрок узнаёт
+-- у наставника, и список растёт вместе со ступенями.
+export type ItemKind = "Clothes" | "Book" | "Phone" | "Knife" | "Liquid" | "Lighter"
+
+-- Что показывают игроку после досмотра.
+export type CheckResult = {
+	passengerId: string,
+	items: { ItemKind },
+}
+
+-- Результат попытки отсортировать. Считается только на сервере.
+export type SortOutcome = {
+	correct: boolean,
+	payout: number, -- уже с учётом VIP и штрафа, всегда >= 0
+	correctChute: ChuteId, -- куда следовало отправить
+}
+
+-- Что лежит в сохранении игрока.
+export type Profile = {
+	money: number,
+	tier: number, -- ступень правил, 1..4
+	upgrades: { [string]: number }, -- идентификатор -> сколько куплено
+	cosmetics: { string },
+	lastSeen: number, -- os.time() последнего выхода, отсюда считается оффлайн
+	backlog: number, -- накопленный завал в чемоданах
+}
+
+-- Один апгрейд в магазине. displayName показывается игроку, поэтому английский.
+export type Upgrade = {
+	id: string,
+	displayName: string,
+	baseCost: number,
+	maxCount: number,
+}
+
+return {}
+]]></string>
+        </Properties>
+      </Item>
+    </Item>
+  </Item>
+  <Item class="ServerScriptService" referent="7">
+    <Properties>
+      <string name="Name">ServerScriptService</string>
+    </Properties>
+    <Item class="Folder" referent="8">
+      <Properties>
+        <string name="Name">Server</string>
+      </Properties>
+      <Item class="ModuleScript" referent="9">
+        <Properties>
+          <string name="Name">BeltService</string>
+          <string name="Source"><![CDATA[--!strict
+-- Лента: появление чемоданов, их продвижение и снятие в конце.
+-- Один экземпляр на плот.
+--
+-- Здесь живёт только логика. Чемодан — это запись в таблице, а не деталь
+-- в мире: физику Roblox мы намеренно не используем, иначе при десятке
+-- чемоданов начнутся тормоза и рассинхрон.
+--
+-- Клиенту уходит одно сообщение на появление и одно на снятие. Положение
+-- он вычисляет сам из времени появления, поэтому за кадр по сети не идёт
+-- ничего.
+--
+-- Сообщения уходят владельцу плота, а не всем на сервере: иначе клиент
+-- рисовал бы у себя чужие чемоданы, а восемь лент слились бы в одну кучу.
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Config = require(ReplicatedStorage.Shared.Config)
+local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local Types = require(ReplicatedStorage.Shared.Types)
+
+local BeltService = {}
+
+export type Belt = {
+	putBag: (ownerId: string) -> (),
+	take: (bagId: string) -> Types.Bag?,
+	getFrontmost: () -> Types.Bag?,
+	getStats: () -> { onBelt: number, queued: number, lost: number },
+	canAcceptBag: () -> boolean,
+	setLostHandler: (handler: (Types.Bag) -> ()) -> (),
+	setQueueBonus: (bonus: number) -> (),
+	step: (deltaTime: number) -> (),
+	sendSnapshot: (player: Player) -> (),
+	destroy: () -> (),
+}
+
+function BeltService.new(plot: any): Belt
+	local bagSpawned = Remotes.get("BagSpawned")
+	local bagDespawned = Remotes.get("BagDespawned")
+	local queueUpdated = Remotes.get("QueueUpdated")
+
+	local bags: { [string]: Types.Bag } = {}
+	local bagCount = 0
+	local nextId = 0
+	local rng = Random.new()
+
+	-- Очередь у конца ленты: чемоданы, до которых игрок не успел.
+	-- Порядок в списке = порядок прибытия.
+	local queue: { string } = {}
+
+	-- Потерянные при переполнении очереди. Это единственный способ
+	-- потерять чемодан: доехать до конца больше не значит пропасть.
+	local lost = 0
+
+	-- Когда последний раз клали чемодан: нужно, чтобы держать просвет
+	-- между ними на ленте.
+	local lastPutAt = -math.huge
+
+	-- Прибавка мест от улучшения. Ставится снаружи: лента не должна
+	-- знать про магазин.
+	local queueBonus = 0
+
+	local onLost: ((Types.Bag) -> ())? = nil
+
+	local api = {}
+
+	local function now(): number
+		return workspace:GetServerTimeNow()
+	end
+
+	-- Всё, что лента сообщает, адресовано хозяину этого аэропорта.
+	local function tell(remote: RemoteEvent, ...)
+		local owner = plot.owner
+		if owner then
+			remote:FireClient(owner, ...)
+		end
+	end
+
+	local function makeBag(ownerId: string): Types.Bag
+		nextId += 1
+
+		local destinations: { Types.Destination } = Config.Destinations
+		local destination: Types.Destination = destinations[rng:NextInteger(1, #destinations)]
+
+		-- Тип указан на переменной, а не выводится из литерала: иначе Luau
+		-- расширяет "Red" до string и перечисление Destination теряется.
+		local bag: Types.Bag = {
+			id = string.format("p%d_bag%d", plot.index, nextId),
+			destination = destination,
+			size = "Normal",
+			fragile = false,
+			flagged = false,
+			isVip = rng:NextNumber() < Config.VipChance,
+			ownerId = ownerId,
+			spawnedAt = now(),
+		}
+		return bag
+	end
+
+	local function queueCapacity(): number
+		return Config.QueueCapacity + queueBonus
+	end
+
+	local function removeFromQueue(bagId: string)
+		local index = table.find(queue, bagId)
+		if index then
+			table.remove(queue, index)
+		end
+	end
+
+	local function forget(bagId: string)
+		bags[bagId] = nil
+		bagCount -= 1
+		removeFromQueue(bagId)
+		tell(bagDespawned, bagId)
+	end
+
+	-- Чемодан доехал до конца ленты и встаёт в очередь.
+	local function enqueue(bag: Types.Bag)
+		table.insert(queue, bag.id)
+
+		-- Переполнение: самый старый чемодан уезжает совсем.
+		if #queue > queueCapacity() then
+			local oldestId = queue[1]
+			local oldest = bags[oldestId]
+			forget(oldestId)
+			lost += 1
+			if onLost and oldest then
+				onLost(oldest)
+			end
+		end
+
+		tell(queueUpdated, queue)
+	end
+
+	function api.setQueueBonus(bonus: number)
+		queueBonus = bonus
+	end
+
+	function api.setLostHandler(handler: (Types.Bag) -> ())
+		onLost = handler
+	end
+
+	-- Положить чемодан на ленту. Зовёт пассажир, дошедший до приёмки:
+	-- сама лента ничего не порождает.
+	function api.putBag(ownerId: string)
+		if bagCount >= Config.BeltCapacity then
+			return -- лента забита: это и есть завал
+		end
+		lastPutAt = now()
+
+		local bag = makeBag(ownerId)
+		bags[bag.id] = bag
+		bagCount += 1
+		tell(bagSpawned, bag)
+	end
+
+	function api.getStats(): { onBelt: number, queued: number, lost: number }
+		-- Едущие по ленте — это все за вычетом тех, кто уже доехал и ждёт
+		-- в очереди.
+		return { onBelt = bagCount - #queue, queued = #queue, lost = lost }
+	end
+
+	-- Готова ли лента принять ещё один чемодан. Проверяет и загрузку,
+	-- и просвет: без просвета чемоданы слипаются в одной точке.
+	function api.canAcceptBag(): boolean
+		if bagCount - #queue >= Config.TargetBagsOnBelt then
+			return false
+		end
+		if bagCount >= Config.BeltCapacity then
+			return false
+		end
+		return now() - lastPutAt >= Config.MinBagGapSeconds
+	end
+
+	-- Чемодан, ближе всех подъехавший к концу ленты: он появился раньше
+	-- прочих. Игрок работает именно с ним, поэтому очередь разбирается
+	-- по порядку, а не выборочно.
+	function api.getFrontmost(): Types.Bag?
+		local frontmost: Types.Bag? = nil
+		for _, bag in bags do
+			if frontmost == nil or bag.spawnedAt < frontmost.spawnedAt then
+				frontmost = bag
+			end
+		end
+		return frontmost
+	end
+
+	-- Снять чемодан после того, как его отсортировали. В отличие от
+	-- переполнения не увеличивает счётчик потерянных.
+	function api.take(bagId: string): Types.Bag?
+		local bag = bags[bagId]
+		if bag == nil then
+			return nil
+		end
+		forget(bagId)
+		tell(queueUpdated, queue)
+		return bag
+	end
+
+	-- Захвативший плот должен увидеть то, что уже едет.
+	function api.sendSnapshot(player: Player)
+		for _, bag in bags do
+			bagSpawned:FireClient(player, bag)
+		end
+		queueUpdated:FireClient(player, queue)
+	end
+
+	function api.step(_deltaTime: number)
+		local current = now()
+		for _, bag in bags do
+			local arrived = current - bag.spawnedAt >= Config.BeltTravelSeconds
+			if arrived and table.find(queue, bag.id) == nil then
+				enqueue(bag)
+			end
+		end
+	end
+
+	function api.destroy()
+		for id in bags do
+			tell(bagDespawned, id)
+		end
+		table.clear(bags)
+		table.clear(queue)
+		bagCount = 0
+		lost = 0
+		onLost = nil
+	end
+
+	return api
+end
+
+return BeltService
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="Script" referent="10">
+        <Properties>
+          <string name="Name">Bootstrap</string>
+          <token name="RunContext">0</token>
+          <string name="Source"><![CDATA[--!strict
+-- Точка входа сервера.
+--
+-- Здесь только глобальное: проверка конфига, деньги, коды, карта плотов
+-- и каналы связи. Всё, что относится к конкретному аэропорту, собирает
+-- PlotRuntime — по одному набору на плот.
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local CodeService = require(script.Parent.CodeService)
+local Config = require(ReplicatedStorage.Shared.Config)
+local EconomyService = require(script.Parent.EconomyService)
+local PlotRuntime = require(script.Parent.PlotRuntime)
+local PlotService = require(script.Parent.PlotService)
+local Remotes = require(ReplicatedStorage.Shared.Remotes)
+
+-- ─────────────────────────────────────────────────────────────
+-- Проверка конфига
+-- ─────────────────────────────────────────────────────────────
+--
+-- Смысл в том, чтобы опечатка в числе — например, 25 вместо 0.25 в доле
+-- оффлайн-дохода — обнаруживалась при запуске, а не через неделю по
+-- кривым метрикам.
+
+local problems: { string } = {}
+
+local function expect(condition: boolean, message: string)
+	if not condition then
+		table.insert(problems, message)
+	end
+end
+
+local function isShare(value: number): boolean
+	return value >= 0 and value <= 1
+end
+
+expect(Config.PassengerInterval > 0, "PassengerInterval must be above zero")
+expect(Config.TargetBagsOnBelt >= 1, "TargetBagsOnBelt must be at least 1")
+expect(Config.PassengerSpeed > 0, "PassengerSpeed must be above zero")
+expect(Config.BeltTravelSeconds > 0, "BeltTravelSeconds must be above zero")
+expect(Config.BeltCapacity >= 1, "BeltCapacity must be at least 1")
+expect(Config.QueueCapacity >= 1, "QueueCapacity must be at least 1")
+expect(Config.LineCapacity >= 1, "LineCapacity must be at least 1")
+expect(Config.WaitCapacity >= 1, "WaitCapacity must be at least 1")
+expect(Config.WaitPerRow >= 1, "WaitPerRow must be at least 1")
+expect(Config.BasePayPerBag > 0, "BasePayPerBag must be above zero")
+expect(Config.VipPayMultiplier >= 1, "VipPayMultiplier must be at least 1")
+expect(Config.CostGrowth > 1, "CostGrowth must be above 1, otherwise prices never rise")
+expect(Config.PlotCount >= 1, "PlotCount must be at least 1")
+expect(Config.PlotColumns >= 1, "PlotColumns must be at least 1")
+
+-- Доли — это доли, а не проценты. Самая вероятная опечатка во всём файле.
+expect(isShare(Config.OversizedChance), "OversizedChance must be between 0 and 1")
+expect(isShare(Config.FragileChance), "FragileChance must be between 0 and 1")
+expect(isShare(Config.FlaggedChance), "FlaggedChance must be between 0 and 1")
+expect(isShare(Config.VipChance), "VipChance must be between 0 and 1")
+expect(isShare(Config.OfflineRate), "OfflineRate must be between 0 and 1")
+expect(isShare(Config.SuspiciousChance), "SuspiciousChance must be between 0 and 1")
+expect(isShare(Config.BeepChance), "BeepChance must be between 0 and 1")
+expect(isShare(Config.GuiltyChance), "GuiltyChance must be between 0 and 1")
+
+expect(Config.BacklogCapSeconds > 0, "BacklogCapSeconds must be above zero")
+expect(#Config.Destinations > 1, "Need at least two destinations to sort between")
+expect(#Config.Tiers == Config.MaxTier, "Tiers list does not match MaxTier")
+
+-- Ступени должны идти по возрастанию, иначе правило откроется раньше предыдущего.
+for i = 2, #Config.Tiers do
+	expect(
+		Config.Tiers[i].unlockAtBags > Config.Tiers[i - 1].unlockAtBags,
+		string.format("Tier %d unlocks no later than tier %d", i, i - 1)
+	)
+end
+
+if #problems > 0 then
+	for _, message in problems do
+		warn("[config] " .. message)
+	end
+	error(string.format("[config] %d problem(s) found — fix Config.luau", #problems))
+end
+
+print(string.format("[server] %s v%s ready", Config.GameName, Config.Version))
+
+-- ─────────────────────────────────────────────────────────────
+-- Глобальные службы
+-- ─────────────────────────────────────────────────────────────
+
+-- Каналы связи создаём до всего остального: часть из них рождается
+-- внутри аэропорта, а клиент ждёт их сразу при входе.
+Remotes.ensureAll()
+
+EconomyService.start()
+CodeService.start()
+
+-- Промокоды: список и решение живут на сервере, клиент шлёт только строку.
+local codeResult = Remotes.get("CodeResult")
+Remotes.get("RedeemCode").OnServerEvent:Connect(function(player, raw)
+	local outcome, money = CodeService.redeem(player, raw)
+	codeResult:FireClient(player, { outcome = outcome, money = money })
+end)
+
+-- ─────────────────────────────────────────────────────────────
+-- Аэропорты по плотам
+-- ─────────────────────────────────────────────────────────────
+
+local runtimes: { [number]: any } = {}
+
+local function runtimeOf(player: Player): any?
+	local plot = PlotService.plotOf(player)
+	return if plot then runtimes[plot.index] else nil
+end
+
+PlotService.setClaimHandler(function(plot)
+	runtimes[plot.index] = PlotRuntime.new(plot)
+
+	-- Переносим хозяина к своему аэропорту: иначе он остаётся на точке
+	-- спавна и идти ему через всю карту.
+	local owner = plot.owner
+	if owner then
+		local character = owner.Character
+		local root = character and character:FindFirstChild("HumanoidRootPart")
+		if root and root:IsA("BasePart") then
+			root.CFrame = CFrame.new(
+				plot.origin + Config.BuildingCenter + Vector3.new(-Config.BuildingSize.X * 0.5 - 20, 2, 0)
+			)
+		end
+	end
+
+	print(string.format("[server] plot %d claimed by %s", plot.index,
+		if owner then owner.Name else "?"))
+end)
+
+PlotService.setReleaseHandler(function(plot)
+	local runtime = runtimes[plot.index]
+	if runtime then
+		runtime.destroy()
+		runtimes[plot.index] = nil
+	end
+	print(string.format("[server] plot %d released", plot.index))
+end)
+
+-- ─────────────────────────────────────────────────────────────
+-- Каналы от клиента
+-- ─────────────────────────────────────────────────────────────
+--
+-- Каждый проверяет, что игрок распоряжается своим аэропортом:
+-- чужим управлять нельзя, даже зайдя в гости.
+
+Remotes.get("SetAirportOpen").OnServerEvent:Connect(function(player, open)
+	local runtime = runtimeOf(player)
+	if runtime and typeof(open) == "boolean" then
+		runtime.setOpen(open)
+	end
+end)
+
+Remotes.get("CheckDecision").OnServerEvent:Connect(function(player, payload)
+	local runtime = runtimeOf(player)
+	if runtime == nil or typeof(payload) ~= "table" then
+		return
+	end
+	local id = payload.passengerId
+	local detain = payload.detain
+	if typeof(id) ~= "string" or typeof(detain) ~= "boolean" then
+		return
+	end
+	runtime.passengers.decide(id, detain)
+end)
+
+Remotes.get("BuyUpgrade").OnServerEvent:Connect(function(player, id)
+	local runtime = runtimeOf(player)
+	if runtime and typeof(id) == "string" then
+		runtime.upgrades.buy(player, id)
+	end
+end)
+
+-- ─────────────────────────────────────────────────────────────
+-- Карта
+-- ─────────────────────────────────────────────────────────────
+
+PlotService.start()
+
+local plotListing = Remotes.get("PlotListing")
+
+local function pushListing()
+	plotListing:FireAllClients(PlotService.listing())
+end
+
+Remotes.get("ClaimPlot").OnServerEvent:Connect(function(player, index)
+	if typeof(index) == "number" then
+		PlotService.claim(player, index)
+		pushListing()
+	end
+end)
+
+Remotes.get("RequestPlots").OnServerEvent:Connect(function(player)
+	plotListing:FireClient(player, PlotService.listing())
+end)
+
+Players.PlayerRemoving:Connect(function()
+	task.defer(pushListing)
+end)
+
+print(string.format("[server] map ready: %d plots, waiting for a claim", Config.PlotCount))
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="11">
+        <Properties>
+          <string name="Name">CodeService</string>
+          <string name="Source"><![CDATA[--!strict
+-- Промокоды.
+--
+-- Список лежит только здесь, на сервере. В общий конфиг его класть
+-- нельзя: всё, что попадает в ReplicatedStorage, клиент читает целиком,
+-- и коды разошлись бы в первый же день.
+--
+-- Клиент присылает строку, сервер решает. Награда начисляется тут же,
+-- клиент получает только ответ «принято» или «нет».
+--
+-- Память о введённых кодах пока живёт до выхода из игры: постоянной
+-- станет вместе с сохранениями.
+
+local Players = game:GetService("Players")
+
+local EconomyService = require(script.Parent.EconomyService)
+
+local CodeService = {}
+
+export type Outcome = "Granted" | "Unknown" | "AlreadyUsed" | "Expired"
+
+type Reward = {
+	money: number?,
+}
+
+type Code = {
+	reward: Reward,
+	-- Код можно погасить: раздали слишком щедро — выключили, не трогая код.
+	active: boolean,
+}
+
+-- Сравнение идёт по верхнему регистру без пробелов, поэтому здесь
+-- ключи можно писать как удобно.
+local CODES: { [string]: Code } = {
+	WELCOME = { reward = { money = 250 }, active = true },
+	BAGGAGE = { reward = { money = 500 }, active = true },
+	FIRSTFLIGHT = { reward = { money = 1000 }, active = true },
+}
+
+local redeemed: { [Player]: { [string]: boolean } } = {}
+
+local function normalise(raw: string): string
+	return string.upper((string.gsub(raw, "%s", "")))
+end
+
+function CodeService.redeem(player: Player, raw: string): (Outcome, number)
+	if typeof(raw) ~= "string" or #raw == 0 or #raw > 40 then
+		return "Unknown", 0
+	end
+
+	local key = normalise(raw)
+	local code = CODES[key]
+	if code == nil then
+		return "Unknown", 0
+	end
+	if not code.active then
+		return "Expired", 0
+	end
+
+	local used = redeemed[player]
+	if used == nil then
+		used = {}
+		redeemed[player] = used
+	end
+	if used[key] then
+		return "AlreadyUsed", 0
+	end
+
+	used[key] = true
+
+	local money = code.reward.money or 0
+	if money > 0 then
+		EconomyService.add(player, money)
+	end
+	return "Granted", money
+end
+
+function CodeService.start()
+	Players.PlayerRemoving:Connect(function(player)
+		redeemed[player] = nil
+	end)
+end
+
+return CodeService
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="12">
+        <Properties>
+          <string name="Name">EconomyService</string>
+          <string name="Source"><![CDATA[--!strict
+-- Деньги игрока.
+--
+-- Единственное место, где меняется баланс. Клиент никогда не присылает
+-- сумму — только намерение, а решение принимает сервер.
+--
+-- Деньги общие для игрока и не зависят от плота: сменив участок, он
+-- останется при своих. Уровни улучшений, наоборот, принадлежат
+-- аэропорту и живут в UpgradeService.
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Config = require(ReplicatedStorage.Shared.Config)
+local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local Types = require(ReplicatedStorage.Shared.Types)
+
+local EconomyService = {}
+
+local walletChanged = Remotes.get("WalletChanged")
+local money: { [Player]: number } = {}
+
+local function pushWallet(player: Player)
+	walletChanged:FireClient(player, money[player] or 0)
+end
+
+function EconomyService.getMoney(player: Player): number
+	return money[player] or 0
+end
+
+-- Начислить. Отрицательная сумма — штраф; баланс при этом никогда
+-- не уходит ниже нуля: наказание должно раздражать, а не разорять.
+function EconomyService.add(player: Player, amount: number)
+	local current = money[player] or 0
+	money[player] = math.max(current + amount, 0)
+	pushWallet(player)
+end
+
+function EconomyService.payForBag(player: Player, bag: Types.Bag, correct: boolean)
+	local value = Config.BasePayPerBag
+	if bag.isVip then
+		value *= Config.VipPayMultiplier
+	end
+	if correct then
+		EconomyService.add(player, value)
+	else
+		EconomyService.add(player, -math.floor(value * Config.MisSortPenalty))
+	end
+end
+
+function EconomyService.payForSearch(player: Player, correct: boolean)
+	local value = Config.BasePayPerBag
+	EconomyService.add(player, if correct then value else -value)
+end
+
+function EconomyService.start()
+	Players.PlayerAdded:Connect(function(player)
+		money[player] = 0
+		pushWallet(player)
+	end)
+	Players.PlayerRemoving:Connect(function(player)
+		money[player] = nil
+	end)
+
+	for _, player in Players:GetPlayers() do
+		money[player] = money[player] or 0
+		pushWallet(player)
+	end
+end
+
+return EconomyService
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="13">
+        <Properties>
+          <string name="Name">PassengerService</string>
+          <string name="Source"><![CDATA[--!strict
+-- Пассажиры: встают в очередь, кладут чемодан на ленту, идут через рамку.
+--
+-- Раньше чемоданы появлялись из воздуха. Теперь у каждого есть хозяин,
+-- и это меняет игру больше, чем кажется: видно, откуда берётся работа,
+-- а рамка получает смысл.
+--
+-- Очередь перед приёмкой — главный источник обратной связи. Когда игрок
+-- не успевает, хвост растёт у него на глазах. Прежний вариант, где
+-- пассажиры просто переставали приходить, прятал эту информацию:
+-- спрос молча исчезал, и понять, что отстаёшь, было нельзя.
+--
+-- Почему пассажиры двигаются на сервере, хотя чемоданы мы намеренно
+-- считаем логически и рисуем на клиенте: чемоданов много и они быстрые,
+-- а пассажиров единицы и они медленные. Для десятка неспешных болванок
+-- серверное движение дешевле в коде и незаметно по сети.
+--
+-- Сейчас это болванки. Скины друзей игрока — более поздний шаг.
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local Config = require(ReplicatedStorage.Shared.Config)
+local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local Types = require(ReplicatedStorage.Shared.Types)
+
+local PassengerService = {}
+
+-- plot и belt относятся к одному аэропорту. Всё состояние ниже —
+-- внутри экземпляра: восемь плотов не должны делить одну очередь.
+function PassengerService.new(plot: any, belt: any, upgrades: any)
+	local api = {}
+
+	local FOLDER_NAME = "Passengers"
+
+	type Stage = "InLine" | "ToDrop" | "ToFrame" | "AtFrame" | "UnderCheck" | "ToWait" | "Waiting" | "ToExit"
+
+	type Passenger = {
+		id: string,
+		model: Part,
+		stage: Stage,
+		target: Vector3,
+		-- Досмотр. suspicious — его следует досмотреть; beeps — рамка
+		-- поймала его сама. Молчащий подозрительный опаснее: он идёт дальше.
+		suspicious: boolean,
+		beeps: boolean,
+		pausedAtFrame: number,
+		searched: boolean,
+		waitedAtFrame: number,
+		items: { Types.ItemKind },
+		guilty: boolean,
+	}
+
+	-- Стоящие в очереди, по порядку прихода. Первый в списке — у приёмки.
+	local line: { Passenger } = {}
+	-- Уже отошедшие от очереди: несут чемодан, идут к рамке или на выход.
+	local moving: { Passenger } = {}
+	-- Прошедшие рамку и ждущие свой чемодан. Пока человек здесь, потеря
+	-- багажа имеет лицо: он уйдёт расстроенным, а не растворится молча.
+	local waiting: { Passenger } = {}
+
+	-- Охрана: двое стоят у рамки и уводят задержанных в будку.
+	-- Арест должен быть виден, а не сводиться к исчезновению человека.
+	type GuardState = "AtPost" | "ToTarget" | "Escorting" | "Returning"
+
+	type Guard = {
+		model: Part,
+		post: Vector3,
+		state: GuardState,
+		captive: Passenger?,
+	}
+
+	local guards: { Guard } = {}
+
+	local folder: Folder? = nil
+	local heartbeat: RBXScriptConnection? = nil
+	local sinceLastArrival = 0
+	local turnedAway = 0
+	local nextId = 0
+	local upset = 0
+	local caught = 0
+	local slipped = 0
+	local falseSearches = 0
+	local rng = Random.new()
+	local frameState = "Idle"
+
+	-- Аэропорт закрыт, пока игрок сам его не откроет. Захват плота и начало
+	-- работы — разные события: свалившийся сразу поток нервирует и не даёт
+	-- осмотреться.
+	local isOpen = false
+
+	-- Кому сообщать об итоге досмотра. Ставится снаружи: пассажиры
+	-- не знают ни про деньги, ни про интерфейс.
+	local onSearched: ((boolean, boolean) -> ())? = nil
+
+	-- Сообщает наружу, перекрыт ли проход. Первый раз игрок иначе не поймёт,
+	-- почему всё встало.
+	local onAlert: ((boolean) -> ())? = nil
+
+	-- Вердикты для тех, чей чемодан решили раньше, чем они дошли до зоны
+	-- ожидания. Без этого при быстрой сортировке человек застревал навсегда:
+	-- resolveBag не находил его среди ждущих и молча ничего не делал.
+	local pendingVerdict: { [string]: boolean } = {}
+
+	-- Папка людей лежит внутри своего плота. В общем Workspace восемь
+	-- аэропортов делили бы одну и затирали друг друга.
+	local function container(): Folder
+		if folder and folder.Parent then
+			return folder
+		end
+		local existing = plot.folder:FindFirstChild(FOLDER_NAME)
+		if existing then
+			existing:Destroy()
+		end
+		local created = Instance.new("Folder")
+		created.Name = FOLDER_NAME
+		created.Parent = plot.folder
+		folder = created
+		return created
+	end
+
+	-- Прошёл ли человек контроль. До этого момента его нельзя отпускать
+	-- к выходу ни под каким предлогом: иначе разбор чемодана уводил бы
+	-- его мимо рамки.
+	local function clearedSecurity(passenger: Passenger): boolean
+		local stage = passenger.stage
+		return stage == "ToWait" or stage == "Waiting" or stage == "ToExit"
+	end
+
+	-- Занят ли пункт досмотра. Считаем занятым весь путь от ленты до
+	-- выхода из рамки: иначе двое оказываются в ней одновременно
+	-- и налезают друг на друга.
+	local function checkpointBusy(): boolean
+		for _, passenger in moving do
+			local stage = passenger.stage
+			if stage == "ToDrop" or stage == "ToFrame" or stage == "AtFrame" or stage == "UnderCheck" then
+				return true
+			end
+		end
+		return false
+	end
+
+	-- Апгрейды читаются на месте, а не кэшируются: купленное должно
+	-- действовать сразу, без перезапуска.
+	local function passengerSpeed(): number
+		local effect = Config.UpgradeEffects.FasterLane
+		return Config.PassengerSpeed + effect.speedBonus * upgrades.getLevel("FasterLane")
+	end
+
+	local function framePause(): number
+		local effect = Config.UpgradeEffects.FasterLane
+		local cut = effect.pauseCut * upgrades.getLevel("FasterLane")
+		return math.max(Config.FramePauseSeconds - cut, 0.5)
+	end
+
+	-- Улучшение сокращает проверку, но не отменяет её: иначе досмотр
+	-- перестал бы чего-либо стоить.
+	local function searchSeconds(): number
+		local effect = Config.UpgradeEffects.FastCheck
+		local cut = effect.checkCut * upgrades.getLevel("FastCheck")
+		return math.max(Config.SearchSeconds - cut, Config.MinSearchSeconds)
+	end
+
+	local function beepChance(): number
+		local effect = Config.UpgradeEffects.BetterScanner
+		local bonus = effect.beepBonus * upgrades.getLevel("BetterScanner")
+		return math.min(Config.BeepChance + bonus, 1)
+	end
+
+	local function lineSlot(index: number): Vector3
+		return (plot.origin + Config.LineStart) + Config.LineStep * (index - 1)
+	end
+
+	-- Ждущие раскладываются в несколько рядов: длинная шеренга занимала
+	-- полэкрана и мешала смотреть на ленту.
+	local function waitSlot(index: number): Vector3
+		local zeroBased = index - 1
+		local column = zeroBased % Config.WaitPerRow
+		local row = math.floor(zeroBased / Config.WaitPerRow)
+		return (plot.origin + Config.WaitStart) + Config.WaitStep * column + Config.WaitRowStep * row
+	end
+
+	-- Что показывает рамка прямо сейчас: пусто, сканер чист, сканер сработал.
+	local function currentFrameState(): string
+		for _, passenger in moving do
+			if passenger.stage == "AtFrame" or passenger.stage == "UnderCheck" then
+				return if passenger.beeps then "Alert" else "Clear"
+			end
+		end
+		return "Idle"
+	end
+
+	local function setFrameState(state: string)
+		if frameState == state then
+			return
+		end
+		frameState = state
+
+		-- Подсказка нужна только когда проход заперт звенящим.
+		if onAlert then
+			onAlert(state == "Alert")
+		end
+
+		local terminal = plot.folder:FindFirstChild("Airport")
+		if not terminal then
+			return
+		end
+		local color = Config.FrameIdleColor
+		if state == "Alert" then
+			color = Config.FrameAlertColor
+		elseif state == "Clear" then
+			color = Config.FrameClearColor
+		end
+		for _, name in { "FrameLeft", "FrameRight", "FrameTop" } do
+			local part = terminal:FindFirstChild(name)
+			if part and part:IsA("BasePart") then
+				part.Color = color
+			end
+		end
+	end
+
+	-- Собирает ручную кладь. У виновного ровно одна запрещённая вещь среди
+	-- разрешённых: искать надо глазами, а не считать количество.
+	local function makeItems(guilty: boolean): { Types.ItemKind }
+		local allowed: { Types.ItemKind } = {}
+		for _, kind in Config.AllItems do
+			if not table.find(Config.ProhibitedItems, kind) then
+				table.insert(allowed, kind)
+			end
+		end
+
+		local items: { Types.ItemKind } = {}
+		for _ = 1, Config.ItemsPerCheck do
+			table.insert(items, allowed[rng:NextInteger(1, #allowed)])
+		end
+
+		if guilty then
+			local banned: { Types.ItemKind } = Config.ProhibitedItems
+			items[rng:NextInteger(1, #items)] = banned[rng:NextInteger(1, #banned)]
+		end
+
+		return items
+	end
+
+	-- Охрана принадлежит аэропорту, а не серверу: создаётся при захвате
+	-- плота и в его координатах. Раньше она появлялась при старте сервера
+	-- и вставала на точке спавна игроков.
+	local function makeGuards()
+		for _, offset in Config.GuardPosts do
+			local post = (plot.origin + offset)
+			local body = Instance.new("Part")
+			body.Name = "Guard"
+			body.Size = Vector3.new(2.2, 5.4, 2.2)
+			body.Color = Config.GuardColor
+			body.Anchored = true
+			body.CanCollide = false
+			body.CanQuery = false
+			body.TopSurface = Enum.SurfaceType.Smooth
+			body.BottomSurface = Enum.SurfaceType.Smooth
+			body.Position = post
+			body.Parent = container()
+
+			table.insert(guards, { model = body, post = post, state = "AtPost", captive = nil })
+		end
+	end
+
+	local function moveToward(part: Part, target: Vector3, speed: number, deltaTime: number): boolean
+		local toTarget = target - part.Position
+		local distance = toTarget.Magnitude
+		local stepLength = speed * deltaTime
+		if distance > stepLength then
+			part.Position = part.Position + toTarget.Unit * stepLength
+			return false
+		end
+		part.Position = target
+		return true
+	end
+
+	local function sendGuards(captive: Passenger)
+		for _, guard in guards do
+			if guard.state == "AtPost" then
+				guard.state = "ToTarget"
+				guard.captive = captive
+			end
+		end
+	end
+
+	local function stepGuards(deltaTime: number)
+		for _, guard in guards do
+			local captive = guard.captive
+			if guard.state == "ToTarget" and captive then
+				if moveToward(guard.model, captive.model.Position, Config.GuardSpeed, deltaTime) then
+					guard.state = "Escorting"
+				end
+			elseif guard.state == "Escorting" and captive then
+				local arrived = moveToward(guard.model, (plot.origin + Config.GuardBooth), Config.GuardSpeed, deltaTime)
+				-- Задержанный идёт вместе с конвоем.
+				captive.model.Position = guard.model.Position + Vector3.new(0, 0, 3)
+				if arrived then
+					captive.model:Destroy()
+					guard.captive = nil
+					guard.state = "Returning"
+				end
+			elseif guard.state == "Returning" then
+				if moveToward(guard.model, guard.post, Config.GuardSpeed, deltaTime) then
+					guard.state = "AtPost"
+				end
+			end
+		end
+	end
+
+	local function makeBody(suspicious: boolean): Part
+		local body = Instance.new("Part")
+		body.Name = "Passenger"
+		body.Size = Vector3.new(2, 5, 2)
+		-- Цвет и есть подсказка: подозрительный отличается оттенком.
+		-- Заметить его — работа игрока, звон достаётся не всем.
+		body.Color = if suspicious then Config.PassengerSuspectColor else Config.PassengerCalmColor
+		body.Anchored = true
+		body.CanCollide = false
+		-- CanQuery обязателен: без него луч мыши не попадает в деталь
+		-- и ClickDetector молчит. Кликать по пассажиру — основа досмотра.
+		body.CanQuery = true
+		body.TopSurface = Enum.SurfaceType.Smooth
+		body.BottomSurface = Enum.SurfaceType.Smooth
+		body.Position = (plot.origin + Config.PassengerEntry)
+		body.Parent = container()
+
+		local detector = Instance.new("ClickDetector")
+		detector.MaxActivationDistance = 200
+		detector.Parent = body
+
+		return body
+	end
+
+	local function arrive()
+		-- Очередь не бесконечна: когда хвост упёрся в потолок, пассажир
+		-- разворачивается. Это потерянный доход, а не тихое ничего.
+		if #line >= Config.LineCapacity then
+			turnedAway += 1
+			return
+		end
+
+		nextId += 1
+		local suspicious = rng:NextNumber() < Config.SuspiciousChance
+		-- Отметка означает «проверь», а не «виновен»: часть проверенных
+		-- окажется чистой, и в этом весь смысл решения.
+		local guilty = suspicious and rng:NextNumber() < Config.GuiltyChance
+		table.insert(line, {
+			id = string.format("p%d", nextId),
+			model = makeBody(suspicious),
+			stage = "InLine",
+			target = lineSlot(#line + 1),
+			suspicious = suspicious,
+			beeps = suspicious and rng:NextNumber() < beepChance(),
+			pausedAtFrame = 0,
+			searched = false,
+			waitedAtFrame = 0,
+			items = makeItems(guilty),
+			guilty = guilty,
+		})
+	end
+
+	local function walk(passenger: Passenger, deltaTime: number): boolean
+		local position = passenger.model.Position
+		local toTarget = passenger.target - position
+		local distance = toTarget.Magnitude
+		local stepLength = passengerSpeed() * deltaTime
+
+		if distance > stepLength then
+			passenger.model.Position = position + toTarget.Unit * stepLength
+			return false
+		end
+
+		passenger.model.Position = passenger.target
+		return true -- дошёл до своей точки
+	end
+
+	-- Отпускает пассажира к выходу с понятной эмоцией.
+	local function release(passenger: Passenger, good: boolean)
+		passenger.model.Color = if good
+			then Color3.fromRGB(150, 220, 160)
+			else Color3.fromRGB(226, 120, 110)
+		passenger.stage = "ToExit"
+		passenger.target = (plot.origin + Config.PassengerExit)
+		if not good then
+			upset += 1
+		end
+	end
+
+	local function stepLine(deltaTime: number)
+		for index, passenger in line do
+			passenger.target = lineSlot(index)
+			walk(passenger, deltaTime)
+		end
+
+		-- Первый в очереди отходит к приёмке, как только на ленте есть место.
+		local head = line[1]
+		if head == nil then
+			return
+		end
+		-- Пункт досмотра одноместный: пока предыдущий не прошёл рамку,
+		-- следующий стоит в очереди. Это разом решает и наложение тел,
+		-- и слипание чемоданов, и делает рамку настоящим узким местом.
+		if checkpointBusy() then
+			return
+		end
+
+		if not belt.canAcceptBag() then
+			return
+		end
+
+		if (head.model.Position - lineSlot(1)).Magnitude > 1 then
+			return -- ещё подходит к началу очереди
+		end
+
+		table.remove(line, 1)
+		head.stage = "ToDrop"
+		head.target = (plot.origin + Config.PassengerDropPoint)
+		table.insert(moving, head)
+	end
+
+	-- Единственное место, где человек попадает в зону ожидания.
+	-- Здесь же применяется вердикт, если чемодан решили раньше времени.
+	-- Не дождавшийся своего чемодана уходит: иначе зона ожидания растёт
+	-- без предела и загромождает пункт.
+	local function evictOldestWaiting()
+		local oldest = waiting[1]
+		if oldest == nil then
+			return
+		end
+		table.remove(waiting, 1)
+		table.insert(moving, oldest)
+		upset += 1
+		release(oldest, false)
+	end
+
+	local function moveToWaiting(passenger: Passenger)
+		local at = table.find(moving, passenger)
+		if at then
+			table.remove(moving, at)
+		end
+
+		local verdict = pendingVerdict[passenger.id]
+		if verdict ~= nil then
+			pendingVerdict[passenger.id] = nil
+			table.insert(moving, passenger)
+			release(passenger, verdict)
+			return
+		end
+
+		if #waiting >= Config.WaitCapacity then
+			evictOldestWaiting()
+		end
+
+		passenger.stage = "ToWait"
+		table.insert(waiting, passenger)
+		passenger.target = waitSlot(#waiting)
+	end
+
+	local function stepMoving(deltaTime: number)
+		for index = #moving, 1, -1 do
+			local passenger = moving[index]
+
+			-- Звенящий стоит у рамки, но не вечно: иначе игрок, не заметивший
+			-- сигнала, оказался бы в тупике без выхода.
+			if passenger.stage == "UnderCheck" then
+				continue -- стоит, пока идёт проверка
+			end
+
+			if passenger.stage == "AtFrame" then
+				passenger.waitedAtFrame += deltaTime
+
+				-- Не звенящий стоит лишь короткое окно и идёт дальше.
+				if not passenger.beeps then
+					passenger.pausedAtFrame += deltaTime
+					if passenger.pausedAtFrame >= framePause() then
+						if passenger.suspicious then
+							slipped += 1
+							if onSearched then
+								onSearched(false, false)
+							end
+						end
+						moveToWaiting(passenger)
+					end
+					continue
+				end
+
+				if passenger.waitedAtFrame >= Config.SearchPatienceSeconds then
+					slipped += 1
+					if onSearched then
+						onSearched(false, false)
+					end
+					release(passenger, false)
+				end
+				continue
+			end
+
+			if not walk(passenger, deltaTime) then
+				continue
+			end
+
+			if passenger.stage == "ToDrop" then
+				belt.putBag(passenger.id)
+				passenger.stage = "ToFrame"
+				passenger.target = (plot.origin + Config.PassengerFramePoint)
+			elseif passenger.stage == "ToFrame" then
+				-- В рамке притормаживают все: звенящий стоит до досмотра,
+				-- остальные — короткое окно, за которое их можно поймать.
+				if not passenger.searched then
+					passenger.stage = "AtFrame"
+					continue
+				end
+
+				moveToWaiting(passenger)
+			else
+				if passenger.suspicious and not passenger.searched then
+					slipped += 1
+					if onSearched then
+						onSearched(false, false)
+					end
+				end
+				passenger.model:Destroy()
+				table.remove(moving, index)
+			end
+		end
+	end
+
+	local function stepWaiting(deltaTime: number)
+		for index, passenger in waiting do
+			passenger.target = waitSlot(index)
+			if walk(passenger, deltaTime) and passenger.stage == "ToWait" then
+				passenger.stage = "Waiting"
+			end
+		end
+	end
+
+	-- Досмотр идёт в два такта: сначала проверка, потом решение игрока.
+	--
+	-- Отметка означает «проверь», а не «виновен», поэтому одного нажатия
+	-- мало: надо увидеть содержимое и решить. Проверка занимает время,
+	-- и всё это время лента едет без присмотра — в этом её цена.
+
+	local checkReady = Remotes.get("CheckReady")
+	local checkStarted = Remotes.get("CheckStarted")
+
+	local function findAnywhere(passengerId: string): Passenger?
+		for _, list in { moving, waiting, line } do
+			for _, passenger in list do
+				if passenger.id == passengerId then
+					return passenger
+				end
+			end
+		end
+		return nil
+	end
+
+	function api.beginCheck(player: Player, passengerId: string)
+		local passenger = findAnywhere(passengerId)
+		if passenger == nil or passenger.searched or passenger.stage == "UnderCheck" then
+			return
+		end
+		-- Досмотр идёт только в рамке: там человек стоит, и только там
+		-- у игрока есть окно, чтобы его поймать.
+		if passenger.stage ~= "AtFrame" then
+			return
+		end
+
+		passenger.stage = "UnderCheck"
+		local seconds = searchSeconds()
+		checkStarted:FireClient(player, {
+			passengerId = passenger.id,
+			seconds = seconds,
+		})
+
+		task.delay(seconds, function()
+			if (passenger.stage :: Stage) ~= "UnderCheck" then
+				return -- успел уйти по нетерпению
+			end
+			checkReady:FireClient(player, {
+				passengerId = passenger.id,
+				items = passenger.items,
+			})
+		end)
+	end
+
+	function api.decide(passengerId: string, detain: boolean)
+		local passenger = findAnywhere(passengerId)
+		if passenger == nil or passenger.stage ~= "UnderCheck" then
+			return
+		end
+
+		passenger.searched = true
+		local correct = detain == passenger.guilty
+		if correct then
+			caught += 1
+		else
+			falseSearches += 1
+		end
+
+		-- Задержанного уводит охрана, отпущенный идёт получать багаж.
+		if detain then
+			passenger.stage = "ToExit" -- шагами больше не управляет
+			local at = table.find(moving, passenger)
+			if at then
+				table.remove(moving, at)
+			end
+			sendGuards(passenger)
+		else
+			if table.find(moving, passenger) == nil then
+				table.insert(moving, passenger)
+			end
+			moveToWaiting(passenger)
+		end
+
+		if onSearched then
+			onSearched(correct, true)
+		end
+	end
+
+	function api.setSearchHandler(handler: (boolean, boolean) -> ())
+		onSearched = handler
+	end
+
+	function api.setAlertHandler(handler: (boolean) -> ())
+		onAlert = handler
+	end
+
+	-- Нажатие по телу пассажира начинает проверку.
+	function api.connectSearch()
+		local box = container()
+		box.ChildAdded:Connect(function(child)
+			local detector = child:FindFirstChildOfClass("ClickDetector")
+			if not detector then
+				return
+			end
+			detector.MouseClick:Connect(function(player)
+				for _, list in { moving, waiting } do
+					for _, passenger in list do
+						if passenger.model == child then
+							api.beginCheck(player, passenger.id)
+							return
+						end
+					end
+				end
+			end)
+		end)
+	end
+
+	-- Судьба чемодана решена: хозяин уходит довольным или расстроенным.
+	-- Зовётся снаружи, чтобы пассажиры ничего не знали про начисления.
+	function api.resolveBag(ownerId: string, good: boolean)
+		for index, passenger in waiting do
+			if passenger.id == ownerId then
+				table.remove(waiting, index)
+				table.insert(moving, passenger)
+				release(passenger, good)
+				return
+			end
+		end
+
+		-- Может оказаться, что человек ещё идёт к рамке или от неё.
+		-- Но стоящего в рамке или под досмотром выпускать нельзя: иначе
+		-- проверку можно было бы обойти, просто разобрав его багаж.
+		for _, passenger in moving do
+			if passenger.id == ownerId then
+				if clearedSecurity(passenger) then
+					release(passenger, good)
+				else
+					-- Ещё идёт к рамке или стоит в ней: отпускать нельзя,
+					-- иначе разбор чемодана уводит его мимо контроля.
+					pendingVerdict[ownerId] = good
+				end
+				return
+			end
+		end
+
+		-- Хозяин ещё не дошёл: запомним вердикт и применим на месте.
+		pendingVerdict[ownerId] = good
+	end
+
+	local function step(deltaTime: number)
+		-- Пока плот не захвачен, водить некого.
+		if not true then
+			return
+		end
+
+		-- Закрытие перекрывает вход, а не жизнь внутри. Иначе люди застывают
+		-- посреди зала, а игрок спокойно разбирает накопленное без всякого
+		-- давления — то есть закрытие превращается в способ фармить.
+		sinceLastArrival += deltaTime
+		if isOpen and sinceLastArrival >= Config.PassengerInterval then
+			sinceLastArrival = 0
+			arrive()
+		end
+
+		stepLine(deltaTime)
+		stepMoving(deltaTime)
+		stepWaiting(deltaTime)
+		stepGuards(deltaTime)
+
+		-- Цвет отражает действительность, а не историю.
+		setFrameState(currentFrameState())
+	end
+
+	function api.getStats(): { inLine: number, moving: number, waiting: number, turnedAway: number, upset: number, caught: number, slipped: number, falseSearches: number }
+		return {
+			inLine = #line,
+			moving = #moving,
+			waiting = #waiting,
+			turnedAway = turnedAway,
+			upset = upset,
+			caught = caught,
+			slipped = slipped,
+			falseSearches = falseSearches,
+		}
+	end
+
+	function api.setOpen(open: boolean)
+		isOpen = open
+	end
+
+	function api.isOpen(): boolean
+		return isOpen
+	end
+
+	-- Аэропорт построен: ставим охрану. Зовётся при захвате плота.
+	function api.buildForPlot()
+		isOpen = false
+		table.clear(guards)
+		container():ClearAllChildren()
+		table.clear(line)
+		table.clear(moving)
+		table.clear(waiting)
+		makeGuards()
+	end
+
+	-- Аэропорт свернули: убираем всё, что стояло в мире.
+	function api.teardown()
+		if heartbeat then
+			heartbeat:Disconnect()
+			heartbeat = nil
+		end
+		table.clear(guards)
+		table.clear(line)
+		table.clear(moving)
+		table.clear(waiting)
+		local box = plot.folder:FindFirstChild(FOLDER_NAME)
+		if box then
+			box:Destroy()
+		end
+		folder = nil
+	end
+
+	function api.start()
+		container()
+		api.connectSearch()
+		-- Обработчик держим в переменной: при сносе плота его надо
+		-- отключить, иначе он останется висеть на мёртвом состоянии.
+		heartbeat = RunService.Heartbeat:Connect(step)
+	end
+
+	return api
+end
+
+return PassengerService
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="14">
+        <Properties>
+          <string name="Name">PlotRuntime</string>
+          <string name="Source"><![CDATA[--!strict
+-- Живой аэропорт одного плота: мир, лента, пассажиры, судья, улучшения.
+--
+-- Здесь собирается всё, что раньше висело на уровне модулей и потому
+-- было одно на весь сервер. Теперь у каждого плота свой набор, и восемь
+-- аэропортов не мешают друг другу.
+--
+-- Точка входа сервера этих связей не знает: она лишь просит создать
+-- аэропорт при захвате плота и снести при уходе.
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local BeltService = require(script.Parent.BeltService)
+local Config = require(ReplicatedStorage.Shared.Config)
+local PassengerService = require(script.Parent.PassengerService)
+local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local SortingService = require(script.Parent.SortingService)
+local UpgradeService = require(script.Parent.UpgradeService)
+local WorldBuilder = require(script.Parent.WorldBuilder)
+
+local PlotRuntime = {}
+
+local STARTING_TIER = 1
+
+export type Runtime = {
+	plot: any,
+	belt: any,
+	passengers: any,
+	sorting: any,
+	upgrades: any,
+	setOpen: (open: boolean) -> (),
+	destroy: () -> (),
+}
+
+local airportState = Remotes.get("AirportState")
+local securityResult = Remotes.get("SecurityResult")
+local securityAlert = Remotes.get("SecurityAlert")
+
+function PlotRuntime.new(plot: any): Runtime
+	local owner = plot.owner
+
+	-- Лента объявлена заранее: улучшениям нужен обработчик покупки,
+	-- а он обращается к ленте. Ссылка проставляется следующей строкой.
+	local belt
+	local upgrades
+
+	upgrades = UpgradeService.new(plot, function()
+		-- Улучшение мест в очереди принадлежит аэропорту, поэтому лента
+		-- получает прибавку снаружи и сама про магазин не знает.
+		if belt then
+			local effect = Config.UpgradeEffects.ExtraStorage
+			belt.setQueueBonus(effect.queueBonus * upgrades.getLevel("ExtraStorage"))
+		end
+	end)
+
+	belt = BeltService.new(plot)
+	local sorting = SortingService.new(plot, belt)
+	local passengers = PassengerService.new(plot, belt, upgrades)
+
+	-- Мир строится в папку своего плота и от его начала.
+	local site = plot.folder:FindFirstChild("Airport") :: Folder
+	local terminal = WorldBuilder.build(site, plot.origin, STARTING_TIER)
+	WorldBuilder.connectChutes(terminal, sorting.trySort)
+	WorldBuilder.setSignText(
+		terminal,
+		if owner then string.upper(owner.Name) .. Config.SignSuffix else "AIRPORT"
+	)
+
+	sorting.setTier(STARTING_TIER)
+
+	-- Потерянный при переполнении чемодан засчитывается как промах.
+	belt.setLostHandler(sorting.registerLoss)
+
+	-- Хозяин чемодана ждёт за рамкой и уходит довольным или расстроенным.
+	sorting.setResolvedHandler(passengers.resolveBag)
+
+	-- Итоги досмотра и состояние прохода уходят только владельцу.
+	passengers.setSearchHandler(function(correct: boolean, wasSearch: boolean)
+		if owner == nil then
+			return
+		end
+		securityResult:FireClient(owner, { correct = correct, wasSearch = wasSearch })
+	end)
+	passengers.setAlertHandler(function(blocked: boolean)
+		if owner then
+			securityAlert:FireClient(owner, blocked)
+		end
+	end)
+
+	passengers.buildForPlot()
+	passengers.start()
+
+	local runtime = {
+		plot = plot,
+		belt = belt,
+		passengers = passengers,
+		sorting = sorting,
+		upgrades = upgrades,
+	}
+
+	-- Лента продвигается вместе с пассажирами: отдельный обработчик ей
+	-- не нужен, а один общий проще выключать при сносе.
+	local heartbeat = game:GetService("RunService").Heartbeat:Connect(belt.step)
+
+	function runtime.setOpen(open: boolean)
+		passengers.setOpen(open)
+		if owner then
+			airportState:FireClient(owner, { claimed = true, open = open, origin = plot.origin })
+		end
+	end
+
+	function runtime.destroy()
+		heartbeat:Disconnect()
+		passengers.teardown()
+		belt.destroy()
+		sorting.destroy()
+		upgrades.destroy()
+		site:ClearAllChildren()
+		if owner then
+			airportState:FireClient(owner, { claimed = false, open = false, origin = nil })
+		end
+	end
+
+	if owner then
+		belt.sendSnapshot(owner)
+		upgrades.sendState(owner)
+		airportState:FireClient(owner, { claimed = true, open = false, origin = plot.origin })
+	end
+
+	return runtime
+end
+
+return PlotRuntime
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="15">
+        <Properties>
+          <string name="Name">PlotService</string>
+          <string name="Source"><![CDATA[--!strict
+-- Плоты: восемь мест на карте, по одному на игрока.
+--
+-- Игрок проходит через ворота свободного плота и получает базу. Занятые
+-- плоты пускают в гости — посмотреть чужой аэропорт можно, управлять
+-- нельзя. При выходе игрока плот освобождается и очищается.
+--
+-- Ключевое следствие для всего остального кода: координаты в Config —
+-- это смещения от начала плота, а не мировые точки. Мир строится
+-- относительно origin, иначе восемь аэропортов встали бы друг на друга.
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Config = require(ReplicatedStorage.Shared.Config)
+
+local PlotService = {}
+
+local FOLDER_NAME = "Plots"
+
+export type Plot = {
+	index: number,
+	origin: Vector3,
+	folder: Folder,
+	owner: Player?,
+}
+
+local plots: { Plot } = {}
+local claimedBy: { [Player]: number } = {}
+
+-- Кого звать, когда плот захватили или освободили. Ставится снаружи,
+-- чтобы плоты ничего не знали про игровую логику.
+local onClaimed: ((Plot) -> ())? = nil
+local onReleased: ((Plot) -> ())? = nil
+
+local function makePart(name: string, size: Vector3, position: Vector3, color: Color3): Part
+	local part = Instance.new("Part")
+	part.Name = name
+	part.Size = size
+	part.Position = position
+	part.Color = color
+	part.Anchored = true
+	part.TopSurface = Enum.SurfaceType.Smooth
+	part.BottomSurface = Enum.SurfaceType.Smooth
+	return part
+end
+
+-- Раскладка сеткой: колонки слева направо, строки от себя.
+local function originFor(index: number): Vector3
+	local zeroBased = index - 1
+	local column = zeroBased % Config.PlotColumns
+	local row = math.floor(zeroBased / Config.PlotColumns)
+
+	local stepX = Config.PlotSize.X + Config.PlotGap.X
+	local stepZ = Config.PlotSize.Y + Config.PlotGap.Y
+
+	-- Центрируем сетку вокруг нуля, чтобы карта не уползала в угол.
+	local columns = Config.PlotColumns
+	local rows = math.ceil(Config.PlotCount / columns)
+	local offsetX = (columns - 1) * stepX * 0.5
+	local offsetZ = (rows - 1) * stepZ * 0.5
+
+	return Vector3.new(column * stepX - offsetX, 0, row * stepZ - offsetZ)
+end
+
+local function buildPlot(index: number, parent: Folder): Plot
+	local origin = originFor(index)
+
+	local folder = Instance.new("Folder")
+	folder.Name = string.format("Plot_%d", index)
+	folder.Parent = parent
+
+	-- Земля плота. Толщиной до самой общей земли: тонкая плита висела
+	-- над пустотой и торчала бортиком по краям.
+	makePart(
+		"Ground",
+		Vector3.new(Config.PlotSize.X, 4, Config.PlotSize.Y),
+		origin + Vector3.new(0, -2, 0),
+		Color3.fromRGB(118, 126, 118)
+	).Parent = folder
+
+	-- Место под здание: сюда WorldBuilder положит аэропорт.
+	local site = Instance.new("Folder")
+	site.Name = "Airport"
+	site.Parent = folder
+
+	return {
+		index = index,
+		origin = origin,
+		folder = folder,
+		owner = nil,
+	}
+end
+
+-- Тропинки между плотами.
+--
+-- Продольные идут насквозь, поперечные — отрезками между ними. Если
+-- класть и те и другие на всю длину, они пересекаются на одной высоте
+-- и мерцают: видеокарта не может решить, что рисовать поверх.
+local function buildPaths(parent: Folder)
+	local stepX = Config.PlotSize.X + Config.PlotGap.X
+	local stepZ = Config.PlotSize.Y + Config.PlotGap.Y
+	local columns = Config.PlotColumns
+	local rows = math.ceil(Config.PlotCount / columns)
+
+	local offsetX = (columns - 1) * stepX * 0.5
+	local offsetZ = (rows - 1) * stepZ * 0.5
+
+	-- Продольные тянутся и через внешние поперечные полосы, иначе
+	-- в углах сетки остаются дыры.
+	local spanZ = rows * stepZ + Config.PlotGap.Y
+	local color = Color3.fromRGB(146, 150, 158)
+
+	-- Тропинка занимает промежуток целиком. Узкая полоса оставляла по
+	-- краям открытую общую землю на -4, и между участками получались
+	-- траншеи в четыре единицы вместо ровной поверхности.
+	local widthX = Config.PlotGap.X
+	local widthZ = Config.PlotGap.Y
+
+	-- Продольные: по одной в каждом промежутке между колонками.
+	for column = 0, columns do
+		local x = (column - 0.5) * stepX - offsetX
+		makePart("PathColumn", Vector3.new(widthX, 4, spanZ),
+			Vector3.new(x, -2, 0), color).Parent = parent
+	end
+
+	-- Поперечные: отрезками над самими участками, чтобы не наезжать
+	-- на продольные.
+	for row = 0, rows do
+		local z = (row - 0.5) * stepZ - offsetZ
+		for column = 0, columns - 1 do
+			local x = column * stepX - offsetX
+			makePart("PathRow", Vector3.new(Config.PlotSize.X, 4, widthZ),
+				Vector3.new(x, -2, z), color).Parent = parent
+		end
+	end
+end
+
+function PlotService.getPlot(index: number): Plot?
+	return plots[index]
+end
+
+function PlotService.plotOf(player: Player): Plot?
+	local index = claimedBy[player]
+	return if index then plots[index] else nil
+end
+
+function PlotService.setClaimHandler(handler: (Plot) -> ())
+	onClaimed = handler
+end
+
+function PlotService.setReleaseHandler(handler: (Plot) -> ())
+	onReleased = handler
+end
+
+local function release(player: Player)
+	local index = claimedBy[player]
+	if index == nil then
+		return
+	end
+	local plot = plots[index]
+	claimedBy[player] = nil
+	plot.owner = nil
+
+	-- Плот очищается: сохранений пока нет, вернувшийся начнёт заново.
+	local site = plot.folder:FindFirstChild("Airport")
+	if site then
+		site:ClearAllChildren()
+	end
+
+	if onReleased then
+		onReleased(plot)
+	end
+end
+
+-- Захват идёт из меню выбора плота, а не проходом через ворота.
+function PlotService.claim(player: Player, index: number)
+	if claimedBy[player] ~= nil then
+		return -- у игрока уже есть плот
+	end
+	local plot = plots[index]
+	if plot == nil or plot.owner ~= nil then
+		return -- занят: пускаем в гости, но не отдаём
+	end
+
+	plot.owner = player
+	claimedBy[player] = index
+
+	if onClaimed then
+		onClaimed(plot)
+	end
+end
+
+-- Что показать в меню выбора: свободен плот или чей он.
+function PlotService.listing(): { { index: number, origin: Vector3, owner: string? } }
+	local rows = {}
+	for index, plot in plots do
+		table.insert(rows, {
+			index = index,
+			origin = plot.origin,
+			owner = if plot.owner then plot.owner.Name else nil,
+		})
+	end
+	return rows
+end
+
+-- Базовая платформа Studio лежит верхом ровно на y=0 — там же, где верх
+-- земли плотов. Две совпадающие плоскости и давали мерцание.
+--
+-- Земли ниже сетки не держим вовсе: любая плита под ней даёт обрыв по
+-- внешнему краю. Вместо неё окантовка в тот же уровень, что и участки.
+local MARGIN = 260
+
+local function gridExtent(): (number, number)
+	local stepX = Config.PlotSize.X + Config.PlotGap.X
+	local stepZ = Config.PlotSize.Y + Config.PlotGap.Y
+	local columns = Config.PlotColumns
+	local rows = math.ceil(Config.PlotCount / columns)
+	-- Внешние тропинки выходят за крайние участки на половину промежутка
+	-- с каждой стороны, поэтому к обоим размерам добавляется целый
+	-- промежуток. Без этого окантовка налезала на сетку по оси X.
+	return columns * stepX + Config.PlotGap.X, rows * stepZ + Config.PlotGap.Y
+end
+
+local function replaceBaseplate(parent: Folder)
+	local baseplate = workspace:FindFirstChild("Baseplate")
+	if baseplate then
+		baseplate:Destroy()
+	end
+	local stale = workspace:FindFirstChild("MapGround")
+	if stale then
+		stale:Destroy()
+	end
+
+	local spanX, spanZ = gridExtent()
+	local halfX, halfZ = spanX * 0.5, spanZ * 0.5
+	local color = Color3.fromRGB(118, 126, 118)
+	local outX = halfX + MARGIN * 0.5
+	local outZ = halfZ + MARGIN * 0.5
+
+	-- Одной полосой на всю ширину не обойтись: у деталей Roblox предел
+	-- размера 2048 единиц, и слишком длинная молча обрезается. Именно
+	-- так у карты пропадали углы — ошибки при этом не возникает.
+	local function slab(size: Vector3, at: Vector3)
+		assert(size.X <= 2048 and size.Z <= 2048, "деталь длиннее предела Roblox")
+		makePart("Border", size, at, color).Parent = parent
+	end
+
+	-- Стороны: ровно по размеру сетки, встык к ней.
+	slab(Vector3.new(spanX, 4, MARGIN), Vector3.new(0, -2, -outZ))
+	slab(Vector3.new(spanX, 4, MARGIN), Vector3.new(0, -2, outZ))
+	slab(Vector3.new(MARGIN, 4, spanZ), Vector3.new(-outX, -2, 0))
+	slab(Vector3.new(MARGIN, 4, spanZ), Vector3.new(outX, -2, 0))
+
+	-- Углы: их не закрывает ни одна из сторон.
+	for _, corner in { Vector2.new(-1, -1), Vector2.new(1, -1), Vector2.new(-1, 1), Vector2.new(1, 1) } do
+		slab(Vector3.new(MARGIN, 4, MARGIN), Vector3.new(corner.X * outX, -2, corner.Y * outZ))
+	end
+end
+
+function PlotService.start()
+	local parent = workspace:FindFirstChild(FOLDER_NAME)
+	if parent then
+		parent:Destroy()
+	end
+	local created = Instance.new("Folder")
+	created.Name = FOLDER_NAME
+	created.Parent = workspace
+
+	replaceBaseplate(created)
+	buildPaths(created)
+
+	for index = 1, Config.PlotCount do
+		plots[index] = buildPlot(index, created)
+	end
+
+	Players.PlayerRemoving:Connect(release)
+end
+
+return PlotService
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="16">
+        <Properties>
+          <string name="Name">SortingService</string>
+          <string name="Source"><![CDATA[--!strict
+-- Судит попытки сортировки. Один экземпляр на плот.
+--
+-- Это единственное место, где решается «верно или мимо». Клиент лишь
+-- сообщает намерение — в какой жёлоб он отправляет, — а какой чемодан
+-- сейчас на очереди и правильный ли это жёлоб, определяет сервер.
+--
+-- Состояние держится внутри экземпляра, а не в модуле: иначе восемь
+-- аэропортов делили бы один счётчик и один ограничитель частоты.
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local EconomyService = require(script.Parent.EconomyService)
+local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local RuleSet = require(ReplicatedStorage.Shared.RuleSet)
+local Types = require(ReplicatedStorage.Shared.Types)
+
+local SortingService = {}
+
+-- Ограничитель частоты. Без него канал превращается в способ
+-- положить сервер, а заодно в способ разобрать ленту одним махом.
+local MIN_SECONDS_BETWEEN_SORTS = 0.15
+
+export type Tally = { correct: number, wrong: number }
+
+export type Sorting = {
+	trySort: (player: Player, chuteId: Types.ChuteId) -> (),
+	registerLoss: (bag: Types.Bag) -> (),
+	setResolvedHandler: (handler: (string, boolean) -> ()) -> (),
+	getTally: (player: Player) -> Tally,
+	setTier: (tier: number) -> (),
+	destroy: () -> (),
+}
+
+-- plot и belt относятся к одному аэропорту. Передаются, а не берутся
+-- из модуля: судья обязан судить именно свою ленту и уведомлять
+-- именно своих.
+function SortingService.new(plot: any, belt: any): Sorting
+	local sortResult = Remotes.get("SortResult")
+
+	local onResolved: ((string, boolean) -> ())? = nil
+	local lastSortAt: { [Player]: number } = {}
+	local tally: { [Player]: Tally } = {}
+
+	-- Ступень пока одна: профилей игроков ещё нет.
+	local tier = 1
+
+	local api = {}
+
+	local function tallyFor(player: Player): Tally
+		local existing = tally[player]
+		if existing then
+			return existing
+		end
+		local created: Tally = { correct = 0, wrong = 0 }
+		tally[player] = created
+		return created
+	end
+
+	function api.setTier(value: number)
+		tier = value
+	end
+
+	function api.setResolvedHandler(handler: (string, boolean) -> ())
+		onResolved = handler
+	end
+
+	function api.getTally(player: Player): Tally
+		return tallyFor(player)
+	end
+
+	function api.trySort(player: Player, chuteId: Types.ChuteId)
+		local now = workspace:GetServerTimeNow()
+		local last = lastSortAt[player]
+		if last ~= nil and now - last < MIN_SECONDS_BETWEEN_SORTS then
+			return -- частим: молча игнорируем
+		end
+		lastSortAt[player] = now
+
+		local bag = belt.getFrontmost()
+		if bag == nil then
+			return -- на ленте пусто, отправлять нечего
+		end
+
+		local correctChute = RuleSet.correctChute(bag, tier)
+		local correct = chuteId == correctChute
+
+		-- Снимаем чемодан в любом случае: ошибка тоже разбирает очередь,
+		-- иначе игрок застревает на одном чемодане.
+		local taken = belt.take(bag.id)
+		if taken == nil then
+			return -- кто-то успел раньше
+		end
+
+		local counts = tallyFor(player)
+		if correct then
+			counts.correct += 1
+		else
+			counts.wrong += 1
+		end
+
+		EconomyService.payForBag(player, bag, correct)
+
+		if onResolved then
+			onResolved(bag.ownerId, correct)
+		end
+
+		sortResult:FireClient(player, {
+			bagId = bag.id,
+			correct = correct,
+			chosenChute = chuteId,
+			correctChute = correctChute,
+			correctCount = counts.correct,
+			wrongCount = counts.wrong,
+		})
+	end
+
+	-- Чемодан, потерянный при переполнении очереди, — тоже промах.
+	-- Зовётся лентой, которая про начисления ничего не знает.
+	--
+	-- Сообщаем владельцу этого плота, а не всем на сервере: раньше
+	-- уведомление уходило каждому, включая чужие аэропорты.
+	function api.registerLoss(bag: Types.Bag)
+		if onResolved then
+			onResolved(bag.ownerId, false)
+		end
+
+		local owner = plot.owner
+		if owner == nil then
+			return
+		end
+
+		local counts = tallyFor(owner)
+		counts.wrong += 1
+		sortResult:FireClient(owner, {
+			bagId = bag.id,
+			correct = false,
+			chosenChute = "",
+			correctChute = bag.destination,
+			correctCount = counts.correct,
+			wrongCount = counts.wrong,
+			lostToQueue = true,
+		})
+	end
+
+	function api.destroy()
+		table.clear(lastSortAt)
+		table.clear(tally)
+		onResolved = nil
+	end
+
+	return api
+end
+
+return SortingService
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="17">
+        <Properties>
+          <string name="Name">UpgradeService</string>
+          <string name="Source"><![CDATA[--!strict
+-- Улучшения аэропорта. Один экземпляр на плот.
+--
+-- Деньги принадлежат игроку и живут в EconomyService, а уровни
+-- улучшений принадлежат аэропорту и живут здесь: если игрок сменит
+-- плот, деньги останутся при нём, а прокачка — при участке.
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Config = require(ReplicatedStorage.Shared.Config)
+local EconomyService = require(script.Parent.EconomyService)
+local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local Types = require(ReplicatedStorage.Shared.Types)
+
+local UpgradeService = {}
+
+export type Row = {
+	id: string,
+	displayName: string,
+	price: number,
+	owned: number,
+	maxCount: number,
+}
+
+export type Upgrades = {
+	getLevel: (id: string) -> number,
+	buy: (player: Player, id: string) -> (),
+	sendState: (player: Player) -> (),
+	destroy: () -> (),
+}
+
+local function upgradeById(id: string): Types.Upgrade?
+	for _, upgrade in Config.Upgrades do
+		if upgrade.id == id then
+			return upgrade
+		end
+	end
+	return nil
+end
+
+function UpgradeService.new(plot: any, onChanged: (() -> ())?): Upgrades
+	local shopChanged = Remotes.get("ShopChanged")
+	local levels: { [string]: number } = {}
+
+	local api = {}
+
+	-- Цена следующей покупки: база, умноженная на рост в степени
+	-- количества уже купленных. Смысл роста — держать время до
+	-- следующей покупки примерно постоянным.
+	local function priceOf(upgrade: Types.Upgrade): number
+		local owned = levels[upgrade.id] or 0
+		return math.floor(upgrade.baseCost * Config.CostGrowth ^ owned)
+	end
+
+	local function state(): { Row }
+		local rows: { Row } = {}
+		for _, upgrade in Config.Upgrades do
+			table.insert(rows, {
+				id = upgrade.id,
+				displayName = upgrade.displayName,
+				price = priceOf(upgrade),
+				owned = levels[upgrade.id] or 0,
+				maxCount = upgrade.maxCount,
+			})
+		end
+		return rows
+	end
+
+	function api.getLevel(id: string): number
+		return levels[id] or 0
+	end
+
+	function api.sendState(player: Player)
+		shopChanged:FireClient(player, state())
+	end
+
+	function api.buy(player: Player, id: string)
+		-- Прокачивать можно только свой аэропорт.
+		if plot.owner ~= player then
+			return
+		end
+
+		local upgrade = upgradeById(id)
+		if upgrade == nil then
+			return
+		end
+
+		local owned = levels[id] or 0
+		if owned >= upgrade.maxCount then
+			return
+		end
+
+		local price = priceOf(upgrade)
+		if EconomyService.getMoney(player) < price then
+			return
+		end
+
+		EconomyService.add(player, -price)
+		levels[id] = owned + 1
+		api.sendState(player)
+
+		if onChanged then
+			onChanged()
+		end
+	end
+
+	function api.destroy()
+		table.clear(levels)
+	end
+
+	return api
+end
+
+return UpgradeService
+]]></string>
+        </Properties>
+      </Item>
+      <Item class="ModuleScript" referent="18">
+        <Properties>
+          <string name="Name">WorldBuilder</string>
+          <string name="Source"><![CDATA[--!strict
+-- Собирает серую геометрию сцены из кода.
+--
+-- Строим кодом, а не руками в Studio, чтобы сцена лежала в git и
+-- восстанавливалась одинаково. Текстур и моделей здесь нет и на этом
+-- шаге быть не должно: если на серых кубах играть неинтересно,
+-- графика этого не исправит.
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Config = require(ReplicatedStorage.Shared.Config)
+local RuleSet = require(ReplicatedStorage.Shared.RuleSet)
+local Types = require(ReplicatedStorage.Shared.Types)
+
+local WorldBuilder = {}
+
+local CHUTE_ATTRIBUTE = "ChuteId"
+
+-- Цвета для жёлобов, у которых нет своего направления.
+local SPECIAL_CHUTE_COLORS: { [string]: Color3 } = {
+	Oversized = Color3.fromRGB(150, 110, 190),
+	Fragile = Color3.fromRGB(220, 140, 90),
+	Security = Color3.fromRGB(90, 90, 100),
+}
+
+local function makePart(name: string, size: Vector3, position: Vector3, color: Color3): Part
+	local part = Instance.new("Part")
+	part.Name = name
+	part.Size = size
+	part.Position = position
+	part.Color = color
+	part.Anchored = true
+	part.TopSurface = Enum.SurfaceType.Smooth
+	part.BottomSurface = Enum.SurfaceType.Smooth
+	return part
+end
+
+-- Принимает обычную строку, а не Types.ChuteId: функция всего лишь ищет
+-- цвет по имени, и лишнее приведение типов здесь ничего не защищает.
+local function chuteColor(chuteId: string): Color3
+	local byDestination: { [string]: Color3 } = Config.DestinationColors
+	return byDestination[chuteId] or SPECIAL_CHUTE_COLORS[chuteId] or Color3.fromRGB(180, 180, 180)
+end
+
+local function buildChutes(origin: Vector3, folder: Folder, tier: number)
+	local chutes = RuleSet.chutesForTier(tier, Config.Destinations)
+	local count = #chutes
+
+	local startPoint = (origin + Config.BeltStart)
+	local endPoint = (origin + Config.BeltEnd)
+	local span = endPoint - startPoint
+
+	-- Раскладываем приёмники вдоль ленты, отступив в сторону.
+	local sideways = Vector3.new(0, 0, Config.BeltWidth * 0.5 + 6)
+
+	for index, chuteId in chutes do
+		-- Равномерно по длине ленты, не прижимая к самым краям.
+		local along = (index - 0.5) / count
+		local position = startPoint + span * along + sideways - Vector3.new(0, 2, 0)
+
+		local chute = makePart(
+			"Chute_" .. chuteId,
+			Vector3.new(8, 4, 8),
+			position,
+			chuteColor(chuteId)
+		)
+		chute:SetAttribute(CHUTE_ATTRIBUTE, chuteId)
+
+		-- ClickDetector срабатывает на сервере и работает как на мыши,
+		-- так и на касании. Отдельный канал связи для ввода не нужен.
+		local detector = Instance.new("ClickDetector")
+		detector.MaxActivationDistance = 200
+		detector.Parent = chute
+
+		chute.Parent = folder
+	end
+end
+
+-- Рамка досмотра: через неё проходит пассажир после того, как сдал багаж.
+-- Пока это просто ворота — механика досмотра появится следующим шагом.
+local function buildFrame(origin: Vector3, folder: Folder)
+	local at = (origin + Config.FramePosition)
+	local pillar = Vector3.new(1.5, 10, 1.5)
+	local grey = Color3.fromRGB(158, 164, 172)
+
+	makePart("FrameLeft", pillar, at - Vector3.new(3.5, 0, 0), grey).Parent = folder
+	makePart("FrameRight", pillar, at + Vector3.new(3.5, 0, 0), grey).Parent = folder
+	makePart("FrameTop", Vector3.new(8.5, 1.5, 1.5), at + Vector3.new(0, 5.5, 0), grey).Parent = folder
+end
+
+-- Будка охраны: сюда уводят задержанных.
+local function buildBooth(origin: Vector3, folder: Folder)
+	local at = (origin + Config.GuardBooth)
+	local wall = Color3.fromRGB(96, 112, 150)
+	makePart("BoothFloor", Vector3.new(16, 1, 12), at - Vector3.new(0, 3, 0), wall).Parent = folder
+	makePart("BoothBack", Vector3.new(16, 8, 1), at + Vector3.new(0, 1, -6), wall).Parent = folder
+	makePart("BoothLeft", Vector3.new(1, 8, 12), at + Vector3.new(-8, 1, 0), wall).Parent = folder
+	makePart("BoothRight", Vector3.new(1, 8, 12), at + Vector3.new(8, 1, 0), wall).Parent = folder
+end
+
+-- Здание аэропорта: общий пол, стены по периметру, проёмы входа
+-- и выхода, вывеска. Всё происходящее — внутри него.
+--
+-- Крыши нет намеренно: сверху смотрит камера, и накрытое здание
+-- превратилось бы в чёрный ящик.
+local function buildBuilding(origin: Vector3, folder: Folder)
+	local center = (origin + Config.BuildingCenter)
+	local width = Config.BuildingSize.X
+	local depth = Config.BuildingSize.Y
+	local wall = Config.WallHeight
+	local floorColor = Color3.fromRGB(104, 110, 122)
+	local wallColor = Color3.fromRGB(132, 140, 154)
+
+	makePart("Floor", Vector3.new(width, 1, depth),
+		center - Vector3.new(0, 3, 0), floorColor).Parent = folder
+
+	local wallY = wall * 0.5 - 2.5
+
+	-- Продольные стены целиком.
+	makePart("WallFar", Vector3.new(width, wall, 2),
+		center + Vector3.new(0, wallY, -depth * 0.5), wallColor).Parent = folder
+	makePart("WallNear", Vector3.new(width, wall, 2),
+		center + Vector3.new(0, wallY, depth * 0.5), wallColor).Parent = folder
+
+	-- Торцевые стены с проёмами: вход слева, выход справа.
+	local function endWall(name: string, sideX: number, doorWidth: number)
+		local piece = (depth - doorWidth) * 0.5
+		local offset = (doorWidth + piece) * 0.5
+		for _, direction in { -1, 1 } do
+			makePart(name, Vector3.new(2, wall, piece),
+				center + Vector3.new(sideX, wallY, direction * offset),
+				wallColor).Parent = folder
+		end
+	end
+
+	endWall("WallEntry", -width * 0.5, Config.EntryDoorWidth)
+	endWall("WallExit", width * 0.5, Config.ExitDoorWidth)
+
+	-- Перемычка над входом и сама вывеска на ней.
+	--
+	-- Ширина ровно по проёму, а верх заподлицо с верхом стены: раньше
+	-- перемычка была шире двери и заходила на стену той же толщины,
+	-- отчего мерцала, а сверху ещё и торчала над стеной.
+	local lintelHeight = 5
+	local lintel = makePart("EntryLintel", Vector3.new(2, lintelHeight, Config.EntryDoorWidth),
+		center + Vector3.new(-width * 0.5, wallY + wall * 0.5 - lintelHeight * 0.5, 0),
+		Color3.fromRGB(150, 158, 172))
+	lintel.Parent = folder
+
+	local sign = Instance.new("SurfaceGui")
+	sign.Name = "Sign"
+	sign.Face = Enum.NormalId.Left
+	sign.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+	sign.PixelsPerStud = 50
+	sign.Parent = lintel
+
+	local label = Instance.new("TextLabel")
+	label.Name = "Text"
+	label.Size = UDim2.new(1, 0, 1, 0)
+	label.BackgroundTransparency = 1
+	label.Font = Enum.Font.GothamBold
+	label.TextScaled = true
+	label.TextColor3 = Color3.fromRGB(245, 248, 252)
+	label.Text = "AIRPORT"
+	label.Parent = sign
+
+	-- Размеченные места под декор.
+	for index, slot in Config.DecorSlots do
+		local worldSlot = (origin + slot)
+		local pad = makePart(
+			string.format("DecorSlot_%d", index),
+			Vector3.new(6, 0.4, 6),
+			worldSlot - Vector3.new(0, 2.8, 0),
+			Color3.fromRGB(88, 94, 106)
+		)
+		pad:SetAttribute("SlotIndex", index)
+		pad.Parent = folder
+	end
+end
+
+-- Меняет надпись на вывеске. По умолчанию это ник игрока, но текст
+-- можно будет задать любой.
+function WorldBuilder.setSignText(folder: Folder, text: string)
+	local lintel = folder:FindFirstChild("EntryLintel")
+	if lintel == nil then
+		return
+	end
+	local sign = lintel:FindFirstChild("Sign")
+	local label = sign and sign:FindFirstChild("Text")
+	if label and label:IsA("TextLabel") then
+		label.Text = text
+	end
+end
+
+-- Строит аэропорт внутрь переданной папки. Координаты берутся от
+-- начала активного плота, поэтому восемь аэропортов не встают друг
+-- на друга.
+-- origin — начало плота. Передаётся явно: общего «текущего плота»
+-- на сервере нет и быть не должно, аэропортов восемь.
+function WorldBuilder.build(site: Folder, origin: Vector3, tier: number)
+	site:ClearAllChildren()
+	local folder = site
+
+	local startPoint = (origin + Config.BeltStart)
+	local endPoint = (origin + Config.BeltEnd)
+	local span = endPoint - startPoint
+	local length = span.Magnitude
+	local middle = startPoint + span * 0.5
+
+	-- Полотно ленты.
+	local belt = makePart(
+		"Belt",
+		Vector3.new(length, 1, Config.BeltWidth),
+		middle - Vector3.new(0, 1, 0),
+		Color3.fromRGB(78, 84, 92)
+	)
+	belt.Parent = folder
+
+	-- Метки начала и конца — чтобы глазом было видно направление движения.
+	local marker = Vector3.new(1, 3, Config.BeltWidth + 2)
+	makePart("StartMarker", marker, startPoint, Color3.fromRGB(120, 128, 138)).Parent = folder
+	makePart("EndMarker", marker, endPoint, Color3.fromRGB(150, 90, 90)).Parent = folder
+
+	buildBuilding(origin, folder)
+	buildChutes(origin, folder, tier)
+	buildFrame(origin, folder)
+	buildBooth(origin, folder)
+
+	return folder
+end
+
+-- Подписывает все жёлоба на обработчик. Вынесено сюда, чтобы строитель
+-- мира ничего не знал про правила начисления.
+function WorldBuilder.connectChutes(folder: Folder, handler: (Player, Types.ChuteId) -> ())
+	for _, child in folder:GetChildren() do
+		local chuteId = child:GetAttribute(CHUTE_ATTRIBUTE)
+		if typeof(chuteId) == "string" then
+			local detector = child:FindFirstChildOfClass("ClickDetector")
+			if detector then
+				detector.MouseClick:Connect(function(player)
+					handler(player, chuteId :: Types.ChuteId)
+				end)
+			end
+		end
+	end
+end
+
+return WorldBuilder
+]]></string>
+        </Properties>
+      </Item>
+    </Item>
+  </Item>
+  <Item class="StarterPlayer" referent="19">
+    <Properties>
+      <string name="Name">StarterPlayer</string>
+    </Properties>
+    <Item class="StarterPlayerScripts" referent="20">
+      <Properties>
+        <string name="Name">StarterPlayerScripts</string>
+      </Properties>
+      <Item class="Folder" referent="21">
+        <Properties>
+          <string name="Name">Client</string>
+        </Properties>
+        <Item class="ModuleScript" referent="22">
+          <Properties>
+            <string name="Name">BeltRenderer</string>
+            <string name="Source"><![CDATA[--!strict
+-- Рисует чемоданы, едущие по ленте.
+--
+-- Сервер сообщает только «появился вот такой чемодан» и «этот снят».
+-- Где чемодан находится прямо сейчас, клиент вычисляет сам: часы
+-- сервера и клиента синхронны, а скорость ленты одинакова у всех.
+-- Поэтому движение идёт без единого сетевого пакета за кадр.
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local Config = require(ReplicatedStorage.Shared.Config)
+local PlotContext = require(ReplicatedStorage.Shared.PlotContext)
+local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local Types = require(ReplicatedStorage.Shared.Types)
+
+local BeltRenderer = {}
+
+type Tracked = {
+	bag: Types.Bag,
+	part: Part,
+}
+
+local tracked: { [string]: Tracked } = {}
+local folder: Folder? = nil
+
+local function container(): Folder
+	if folder and folder.Parent then
+		return folder
+	end
+	local created = Instance.new("Folder")
+	created.Name = "BagsLocal"
+	created.Parent = workspace
+	folder = created
+	return created
+end
+
+-- Цвет всегда показывает направление — иначе игрок не сможет решить,
+-- куда везти чемодан. VIP отмечается свечением поверх того же цвета,
+-- а не подменой цвета: подменённый цвет прятал бы правильный ответ.
+local function colorFor(bag: Types.Bag): Color3
+	local colors: { [string]: Color3 } = Config.DestinationColors
+	return colors[bag.destination] or Color3.fromRGB(200, 200, 200)
+end
+
+local function onSpawned(bag: Types.Bag)
+	if tracked[bag.id] then
+		return
+	end
+
+	local part = Instance.new("Part")
+	part.Name = bag.id
+	part.Size = Config.BagSize
+	part.Color = colorFor(bag)
+	part.Anchored = true
+	part.CanCollide = false
+	part.CanQuery = false
+	part.CanTouch = false
+	part.TopSurface = Enum.SurfaceType.Smooth
+	part.BottomSurface = Enum.SurfaceType.Smooth
+	part.Position = PlotContext.at(Config.BeltStart)
+	if bag.isVip then
+		part.Material = Enum.Material.Neon
+	end
+	part.Parent = container()
+
+	tracked[bag.id] = { bag = bag, part = part }
+end
+
+local function onDespawned(bagId: string)
+	local entry = tracked[bagId]
+	if not entry then
+		return
+	end
+	entry.part:Destroy()
+	tracked[bagId] = nil
+end
+
+-- Подсветка чемодана, который сейчас на очереди. Игрок работает всегда
+-- с ближайшим к концу ленты, поэтому он обязан быть виден сразу.
+local highlight: Highlight? = nil
+
+local function ensureHighlight(): Highlight
+	if highlight and highlight.Parent ~= nil then
+		return highlight
+	end
+	local created = Instance.new("Highlight")
+	created.Name = "NextBag"
+	-- Заливки быть не должно: она подмешивает белый к цвету чемодана,
+	-- а цвет — единственный источник информации в этой игре.
+	-- Зелёный под белой заливкой читается как оливковый, и игрок
+	-- ошибается не по своей вине.
+	created.FillTransparency = 1
+	created.OutlineTransparency = 0
+	created.OutlineColor = Color3.fromRGB(255, 255, 255)
+	created.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+	created.Parent = container()
+	highlight = created
+	return created
+end
+
+local function frontmost(): Tracked?
+	local best: Tracked? = nil
+	for _, entry in tracked do
+		if best == nil or entry.bag.spawnedAt < best.bag.spawnedAt then
+			best = entry
+		end
+	end
+	return best
+end
+
+-- Порядок чемоданов, доехавших до конца и ждущих разбора.
+local queueOrder: { string } = {}
+
+local function queueSlot(bagId: string): Vector3?
+	local index = table.find(queueOrder, bagId)
+	if index == nil then
+		return nil
+	end
+	return PlotContext.at(Config.QueueStart) + Config.QueueStep * (index - 1)
+end
+
+local function step()
+	local now = workspace:GetServerTimeNow()
+	local travel = Config.BeltTravelSeconds
+
+	for _, entry in tracked do
+		local slot = queueSlot(entry.bag.id)
+		if slot then
+			-- В очереди чемодан стоит на месте: он уже приехал.
+			entry.part.Position = slot
+		else
+			local elapsed = now - entry.bag.spawnedAt
+			local alpha = math.clamp(elapsed / travel, 0, 1)
+			entry.part.Position = PlotContext.at(Config.BeltStart):Lerp(PlotContext.at(Config.BeltEnd), alpha)
+		end
+	end
+
+	local next = frontmost()
+	ensureHighlight().Adornee = if next then next.part else nil
+end
+
+function BeltRenderer.countOnBelt(): number
+	local count = 0
+	for _ in tracked do
+		count += 1
+	end
+	return count
+end
+
+function BeltRenderer.countQueued(): number
+	return #queueOrder
+end
+
+function BeltRenderer.start()
+	Remotes.get("BagSpawned").OnClientEvent:Connect(onSpawned)
+	Remotes.get("BagDespawned").OnClientEvent:Connect(onDespawned)
+	Remotes.get("QueueUpdated").OnClientEvent:Connect(function(order: { string })
+		queueOrder = order
+	end)
+	RunService.RenderStepped:Connect(step)
+end
+
+return BeltRenderer
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="LocalScript" referent="23">
+          <Properties>
+            <string name="Name">Bootstrap</string>
+            <string name="Source"><![CDATA[--!strict
+-- Точка входа клиента.
+--
+-- Клиент читает конфиг только ради интерфейса: показать цену, подписать жёлоб.
+-- Ничего ценного он не считает — все начисления и проверки живут на сервере.
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Config = require(ReplicatedStorage.Shared.Config)
+local BeltRenderer = require(script.Parent.BeltRenderer)
+local HUD = require(script.Parent.HUD)
+local Menu = require(script.Parent.Menu)
+local Settings = require(script.Parent.Settings)
+local SearchPanel = require(script.Parent.SearchPanel)
+local Shop = require(script.Parent.Shop)
+
+print(string.format("[client] %s v%s ready", Config.GameName, Config.Version))
+print(string.format("[client] sorting between %d destinations", #Config.Destinations))
+
+BeltRenderer.start()
+HUD.start()
+SearchPanel.start()
+Shop.start()
+Settings.start()
+Menu.start()
+print("[client] renderer and HUD running")
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="24">
+          <Properties>
+            <string name="Name">HUD</string>
+            <string name="Source"><![CDATA[--!strict
+-- Простейший счётчик на экране.
+--
+-- Полноценный интерфейс — это более поздний шаг. Здесь ровно столько,
+-- чтобы во время проверки на серых кубах было видно, сколько разобрано
+-- верно и сколько мимо: без этих двух чисел нельзя судить, играется ли.
+--
+-- Надписи по-английски: игра англоязычная, остальное закрывает
+-- автоперевод Roblox.
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local PlotContext = require(ReplicatedStorage.Shared.PlotContext)
+local Remotes = require(ReplicatedStorage.Shared.Remotes)
+
+local HUD = {}
+
+type SortReport = {
+	bagId: string,
+	correct: boolean,
+	chosenChute: string,
+	correctChute: string,
+	correctCount: number,
+	wrongCount: number,
+	lostToQueue: boolean?,
+}
+
+type SecurityReport = {
+	correct: boolean,
+	wasSearch: boolean,
+}
+
+local openButton: TextButton? = nil
+local claimed = false
+local airportOpen = false
+
+local scoreLabel: TextLabel? = nil
+local hintLabel: TextLabel? = nil
+local securityLabel: TextLabel? = nil
+local caught = 0
+local slipped = 0
+local laneBlocked = false
+
+local function makeLabel(parent: Instance, position: UDim2, size: UDim2, textSize: number): TextLabel
+	local label = Instance.new("TextLabel")
+	label.BackgroundTransparency = 1
+	label.Position = position
+	label.Size = size
+	label.Font = Enum.Font.GothamBold
+	label.TextSize = textSize
+	label.TextColor3 = Color3.fromRGB(255, 255, 255)
+	label.TextStrokeTransparency = 0.4
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.Text = ""
+	label.Parent = parent
+	return label
+end
+
+local function build()
+	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+
+	local gui = Instance.new("ScreenGui")
+	gui.Name = "HUD"
+	gui.ResetOnSpawn = false
+	-- Верхнюю панель Roblox (меню, чат, микрофон) нельзя перекрывать:
+	-- при IgnoreGuiInset = true наши надписи уезжают под неё.
+	gui.IgnoreGuiInset = false
+	gui.Parent = playerGui
+
+	scoreLabel = makeLabel(gui, UDim2.new(0, 24, 0, 24), UDim2.new(0, 400, 0, 34), 26)
+	hintLabel = makeLabel(gui, UDim2.new(0, 24, 0, 58), UDim2.new(0, 500, 0, 26), 18)
+	securityLabel = makeLabel(gui, UDim2.new(0, 24, 0, 88), UDim2.new(0, 500, 0, 26), 18)
+
+	if scoreLabel then
+		scoreLabel.Text = "Sorted 0   Missed 0"
+	end
+	if hintLabel then
+		hintLabel.Text = "Click a chute to send the highlighted bag"
+	end
+	if securityLabel then
+		securityLabel.Text = "Search 0   Slipped 0"
+		securityLabel.TextColor3 = Color3.fromRGB(190, 196, 210)
+	end
+
+	-- Кнопка открытия. Аэропорт не начинает работать сам: игрок сначала
+	-- осматривается, потом запускает поток.
+	local open = Instance.new("TextButton")
+	open.Size = UDim2.new(0, 180, 0, 44)
+	open.Position = UDim2.new(0, 24, 0, 124)
+	open.Font = Enum.Font.GothamBold
+	open.TextSize = 17
+	open.BorderSizePixel = 0
+	open.AutoButtonColor = true
+	open.Visible = false
+	open.Parent = gui
+	openButton = open
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 10)
+	corner.Parent = open
+
+	local setOpen = Remotes.get("SetAirportOpen")
+	open.Activated:Connect(function()
+		setOpen:FireServer(not airportOpen)
+	end)
+
+	-- Настройки должны быть доступны и в игре, а не только из меню:
+	-- громкость и облегчённый режим нужны как раз во время работы.
+	local settings = Instance.new("TextButton")
+	settings.Size = UDim2.new(0, 44, 0, 44)
+	settings.Position = UDim2.new(0, 212, 0, 124)
+	settings.BackgroundColor3 = Color3.fromRGB(52, 60, 74)
+	settings.Font = Enum.Font.GothamBold
+	settings.TextSize = 22
+	settings.TextColor3 = Color3.fromRGB(230, 236, 244)
+	settings.Text = "⚙"
+	settings.BorderSizePixel = 0
+	settings.AutoButtonColor = true
+	settings.Parent = gui
+
+	local settingsCorner = Instance.new("UICorner")
+	settingsCorner.CornerRadius = UDim.new(0, 10)
+	settingsCorner.Parent = settings
+
+	settings.Activated:Connect(function()
+		local screen = playerGui:FindFirstChild("Settings")
+		if screen and screen:IsA("ScreenGui") then
+			screen.Enabled = true
+		end
+	end)
+end
+
+local function onResult(report: SortReport)
+	if scoreLabel then
+		scoreLabel.Text = string.format("Sorted %d   Missed %d", report.correctCount, report.wrongCount)
+		scoreLabel.TextColor3 = if report.correct
+			then Color3.fromRGB(150, 235, 160)
+			else Color3.fromRGB(240, 140, 130)
+	end
+
+	if hintLabel and not laneBlocked then
+		if report.correct then
+			hintLabel.Text = "Correct"
+		elseif report.lostToQueue then
+			hintLabel.Text = "Queue overflowed — a bag was lost"
+		else
+			hintLabel.Text = string.format("Wrong — that one belonged to %s", report.correctChute)
+		end
+	end
+end
+
+-- Пока проход перекрыт, подсказка держится: она объясняет, почему
+-- очередь встала, и не должна теряться под сообщениями про багаж.
+local function onAlert(blocked: boolean)
+	laneBlocked = blocked
+	if not hintLabel then
+		return
+	end
+	if blocked then
+		hintLabel.Text = "Scanner alert — click the waiting passenger to reopen the lane"
+		hintLabel.TextColor3 = Color3.fromRGB(240, 170, 120)
+	else
+		hintLabel.Text = "Lane open"
+		hintLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+	end
+end
+
+local function onSecurity(report: SecurityReport)
+	if report.wasSearch then
+		if report.correct then
+			caught += 1
+		end
+	else
+		slipped += 1
+	end
+
+	if securityLabel then
+		securityLabel.Text = string.format("Search %d   Slipped %d", caught, slipped)
+		securityLabel.TextColor3 = if report.wasSearch and report.correct
+			then Color3.fromRGB(150, 235, 160)
+			elseif report.wasSearch then Color3.fromRGB(220, 200, 140)
+			else Color3.fromRGB(240, 140, 130)
+	end
+end
+
+local function refreshOpenButton()
+	local button = openButton
+	if button == nil then
+		return
+	end
+	button.Visible = claimed
+	button.Text = if airportOpen then "Close airport" else "Open airport"
+	button.BackgroundColor3 = if airportOpen
+		then Color3.fromRGB(120, 74, 66)
+		else Color3.fromRGB(52, 116, 92)
+	button.TextColor3 = Color3.fromRGB(240, 250, 244)
+end
+
+function HUD.start()
+	build()
+
+	Remotes.get("AirportState").OnClientEvent:Connect(function(state)
+		claimed = state.claimed
+		airportOpen = state.open
+		-- Отсюда клиент узнаёт, где стоит его аэропорт: отрисовка
+		-- чемоданов считает координаты от начала плота.
+		PlotContext.set(state.origin)
+		refreshOpenButton()
+	end)
+	refreshOpenButton()
+	Remotes.get("SortResult").OnClientEvent:Connect(onResult)
+	Remotes.get("SecurityResult").OnClientEvent:Connect(onSecurity)
+	Remotes.get("SecurityAlert").OnClientEvent:Connect(onAlert)
+end
+
+return HUD
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="25">
+          <Properties>
+            <string name="Name">Menu</string>
+            <string name="Source"><![CDATA[--!strict
+-- Главное меню и выбор плота.
+--
+-- Игрок попадает сюда сразу при входе: сначала название и кнопки, потом
+-- облёт участков. Камера встаёт напротив входа выбранного аэропорта,
+-- стрелки листают, свободный можно занять.
+--
+-- Пока меню открыто, камера отвязана от персонажа: игрок смотрит карту,
+-- а не бегает по ней.
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+
+local Config = require(ReplicatedStorage.Shared.Config)
+local Remotes = require(ReplicatedStorage.Shared.Remotes)
+
+local Menu = {}
+
+type PlotRow = {
+	index: number,
+	origin: Vector3,
+	owner: string?,
+}
+
+local gui: ScreenGui? = nil
+local titleScreen: Frame? = nil
+local browser: Frame? = nil
+local plotLabel: TextLabel? = nil
+local ownerLabel: TextLabel? = nil
+local claimButton: TextButton? = nil
+
+local rows: { PlotRow } = {}
+local current = 1
+local camera: Camera? = nil
+local wanted: CFrame? = nil
+local holdConnection: RBXScriptConnection? = nil
+
+-- Пока меню открыто, остальной интерфейс прячем: он относится к игре,
+-- в которую ещё не вошли.
+local function setGameGuiVisible(visible: boolean)
+	local playerGui = Players.LocalPlayer:FindFirstChild("PlayerGui")
+	if playerGui == nil then
+		return
+	end
+	for _, name in { "HUD", "Shop" } do
+		local screen = playerGui:FindFirstChild(name)
+		if screen and screen:IsA("ScreenGui") then
+			screen.Enabled = visible
+		end
+	end
+end
+
+-- Точка, откуда смотрим на аэропорт: снаружи, напротив входа.
+local function viewFor(origin: Vector3): (CFrame, Vector3)
+	local entrance = origin
+		+ Config.BuildingCenter
+		+ Vector3.new(-Config.BuildingSize.X * 0.5, 4, 0)
+	local eye = entrance + Vector3.new(-120, 62, 0)
+	return CFrame.new(eye, entrance), entrance
+end
+
+local function showPlot(index: number)
+	if #rows == 0 then
+		return
+	end
+	current = ((index - 1) % #rows) + 1
+	local row = rows[current]
+
+	if plotLabel then
+		plotLabel.Text = string.format("PLOT %d", row.index)
+	end
+	if ownerLabel then
+		ownerLabel.Text = if row.owner then string.upper(row.owner) else "FREE"
+		ownerLabel.TextColor3 = if row.owner
+			then Color3.fromRGB(226, 150, 120)
+			else Color3.fromRGB(150, 235, 160)
+	end
+	if claimButton then
+		local free = row.owner == nil
+		claimButton.Visible = free
+	end
+
+	local cam = camera
+	if cam then
+		local target = viewFor(row.origin)
+		wanted = target
+		TweenService:Create(cam, TweenInfo.new(0.5, Enum.EasingStyle.Quad), { CFrame = target }):Play()
+	end
+end
+
+local function makeButton(parent: Instance, text: string, size: UDim2, position: UDim2, color: Color3): TextButton
+	local button = Instance.new("TextButton")
+	button.Size = size
+	button.Position = position
+	button.BackgroundColor3 = color
+	button.Text = text
+	button.Font = Enum.Font.GothamBold
+	button.TextSize = 20
+	button.TextColor3 = Color3.fromRGB(245, 250, 255)
+	button.BorderSizePixel = 0
+	button.AutoButtonColor = true
+	button.Parent = parent
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 10)
+	corner.Parent = button
+	return button
+end
+
+-- Возврат камеры к персонажу.
+--
+-- Одного присвоения типа мало сразу по двум причинам: без назначенного
+-- субъекта камере не за кем следовать, а запущенный ранее твин
+-- продолжает двигать CFrame и перебивает результат. Поэтому сначала
+-- гасим твин собственным присвоением, потом несколько кадров держим
+-- нужное состояние.
+local function returnCameraToCharacter()
+	local player = Players.LocalPlayer
+	local character = player.Character or player.CharacterAdded:Wait()
+	local humanoid = character:WaitForChild("Humanoid", 10)
+	if humanoid == nil or not humanoid:IsA("Humanoid") then
+		return
+	end
+
+	for _ = 1, 12 do
+		local cam = workspace.CurrentCamera
+		if cam then
+			cam.CameraSubject = humanoid
+			cam.CameraType = Enum.CameraType.Custom
+			if cam.CameraType == Enum.CameraType.Custom and cam.CameraSubject == humanoid then
+				-- Дадим кадру примениться и убедимся, что не перебили обратно.
+				RunService.RenderStepped:Wait()
+				if cam.CameraType == Enum.CameraType.Custom then
+					return
+				end
+			end
+		end
+		RunService.RenderStepped:Wait()
+	end
+end
+
+local function closeMenu()
+	if gui then
+		gui.Enabled = false
+	end
+	if holdConnection then
+		holdConnection:Disconnect()
+		holdConnection = nil
+	end
+	wanted = nil
+	setGameGuiVisible(true)
+	task.spawn(returnCameraToCharacter)
+end
+
+local function openBrowser()
+	if titleScreen then
+		titleScreen.Visible = false
+	end
+	if browser then
+		browser.Visible = true
+	end
+	Remotes.get("RequestPlots"):FireServer()
+	showPlot(current)
+end
+
+local function build()
+	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+
+	local screen = Instance.new("ScreenGui")
+	screen.Name = "Menu"
+	screen.ResetOnSpawn = false
+	screen.IgnoreGuiInset = true
+	screen.DisplayOrder = 10
+	screen.Parent = playerGui
+	gui = screen
+
+	-- Титульный экран.
+	local title = Instance.new("Frame")
+	title.Size = UDim2.new(1, 0, 1, 0)
+	title.BackgroundColor3 = Color3.fromRGB(16, 20, 28)
+	title.BackgroundTransparency = 0.25
+	title.BorderSizePixel = 0
+	title.Parent = screen
+	titleScreen = title
+
+	local name = Instance.new("TextLabel")
+	name.BackgroundTransparency = 1
+	name.Size = UDim2.new(1, 0, 0, 90)
+	name.Position = UDim2.new(0, 0, 0.24, 0)
+	name.Font = Enum.Font.GothamBold
+	name.TextSize = 62
+	name.TextColor3 = Color3.fromRGB(245, 250, 255)
+	name.Text = string.upper(Config.GameName)
+	name.Parent = title
+
+	makeButton(title, "Play", UDim2.new(0, 240, 0, 54), UDim2.new(0.5, -120, 0.5, -10),
+		Color3.fromRGB(52, 116, 92)).Activated:Connect(openBrowser)
+
+	makeButton(title, "Settings", UDim2.new(0, 240, 0, 48), UDim2.new(0.5, -120, 0.5, 56),
+		Color3.fromRGB(52, 60, 74)).Activated:Connect(function()
+		local settings = playerGui:FindFirstChild("Settings")
+		if settings and settings:IsA("ScreenGui") then
+			settings.Enabled = true
+		end
+	end)
+
+	-- Обзор участков. Экран почти прозрачный: смотрим на мир, а не на панель.
+	local pick = Instance.new("Frame")
+	pick.Size = UDim2.new(1, 0, 1, 0)
+	pick.BackgroundTransparency = 1
+	pick.Visible = false
+	pick.Parent = screen
+	browser = pick
+
+	local plot = Instance.new("TextLabel")
+	plot.BackgroundTransparency = 1
+	plot.Size = UDim2.new(1, 0, 0, 54)
+	plot.Position = UDim2.new(0, 0, 0.08, 0)
+	plot.Font = Enum.Font.GothamBold
+	plot.TextSize = 40
+	plot.TextColor3 = Color3.fromRGB(245, 250, 255)
+	plot.TextStrokeTransparency = 0.3
+	plot.Text = "PLOT 1"
+	plot.Parent = pick
+	plotLabel = plot
+
+	local owner = Instance.new("TextLabel")
+	owner.BackgroundTransparency = 1
+	owner.Size = UDim2.new(1, 0, 0, 34)
+	owner.Position = UDim2.new(0, 0, 0.08, 56)
+	owner.Font = Enum.Font.GothamMedium
+	owner.TextSize = 24
+	owner.TextStrokeTransparency = 0.4
+	owner.Text = "FREE"
+	owner.Parent = pick
+	ownerLabel = owner
+
+	makeButton(pick, "‹", UDim2.new(0, 64, 0, 64), UDim2.new(0.5, -220, 0.5, -32),
+		Color3.fromRGB(44, 52, 66)).Activated:Connect(function()
+		showPlot(current - 1)
+	end)
+	makeButton(pick, "›", UDim2.new(0, 64, 0, 64), UDim2.new(0.5, 156, 0.5, -32),
+		Color3.fromRGB(44, 52, 66)).Activated:Connect(function()
+		showPlot(current + 1)
+	end)
+
+	claimButton = makeButton(pick, "Claim", UDim2.new(0, 220, 0, 56),
+		UDim2.new(0.5, -110, 1, -140), Color3.fromRGB(52, 116, 92))
+	if claimButton then
+		claimButton.Activated:Connect(function()
+			local row = rows[current]
+			if row and row.owner == nil then
+				Remotes.get("ClaimPlot"):FireServer(row.index)
+				closeMenu()
+			end
+		end)
+	end
+
+	makeButton(pick, "Back", UDim2.new(0, 140, 0, 44), UDim2.new(0, 24, 1, -76),
+		Color3.fromRGB(52, 60, 74)).Activated:Connect(function()
+		pick.Visible = false
+		title.Visible = true
+	end)
+end
+
+function Menu.start()
+	build()
+
+	setGameGuiVisible(false)
+
+	-- Обзор карты сверху, пока не выбран плот.
+	local overview = CFrame.new(Vector3.new(0, 1100, 1100), Vector3.zero)
+	wanted = overview
+
+	local cam = workspace.CurrentCamera
+	camera = cam
+	if cam then
+		cam.CameraType = Enum.CameraType.Scriptable
+		cam.CFrame = overview
+	end
+
+	-- Камеру приходится сторожить: при появлении персонажа Roblox
+	-- переключает её обратно на него, и одной установки не хватает.
+	holdConnection = RunService.RenderStepped:Connect(function()
+		local live = workspace.CurrentCamera
+		local target = wanted
+		if live == nil or target == nil then
+			return
+		end
+		camera = live
+		if live.CameraType ~= Enum.CameraType.Scriptable then
+			live.CameraType = Enum.CameraType.Scriptable
+			live.CFrame = target
+		end
+	end)
+
+	Remotes.get("PlotListing").OnClientEvent:Connect(function(listing: { PlotRow })
+		rows = listing
+		table.sort(rows, function(a, b)
+			return a.index < b.index
+		end)
+		if browser and browser.Visible then
+			showPlot(current)
+		end
+	end)
+
+	Remotes.get("RequestPlots"):FireServer()
+end
+
+return Menu
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="26">
+          <Properties>
+            <string name="Name">SearchPanel</string>
+            <string name="Source"><![CDATA[--!strict
+-- Окно досмотра: ожидание проверки, содержимое ручной клади и решение.
+--
+-- Вещи показываются формой и цветом, без подписей: аудитория молодая
+-- и многоязычная, а читать во время работы ленты некогда.
+--
+-- Решает игрок, а судит сервер. Отсюда уходит только выбор — задержать
+-- или пропустить.
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
+
+local Config = require(ReplicatedStorage.Shared.Config)
+local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local Types = require(ReplicatedStorage.Shared.Types)
+
+local SearchPanel = {}
+
+local gui: ScreenGui? = nil
+local statusLabel: TextLabel? = nil
+local itemsRow: Frame? = nil
+local buttonsRow: Frame? = nil
+
+local activeId: string? = nil
+local countdownEndsAt = 0
+local countdownConnection: RBXScriptConnection? = nil
+
+-- Каждой вещи своя форма: цвет один не различить у дальтоника,
+-- а вместе с силуэтом читается однозначно.
+local SHAPES: { [string]: { size: UDim2, corner: number } } = {
+	Clothes = { size = UDim2.new(0.7, 0, 0.45, 0), corner = 6 },
+	Book = { size = UDim2.new(0.45, 0, 0.7, 0), corner = 2 },
+	Phone = { size = UDim2.new(0.3, 0, 0.72, 0), corner = 8 },
+	Knife = { size = UDim2.new(0.12, 0, 0.8, 0), corner = 2 },
+	Liquid = { size = UDim2.new(0.55, 0, 0.55, 0), corner = 40 },
+	Lighter = { size = UDim2.new(0.35, 0, 0.35, 0), corner = 4 },
+}
+
+local function makeButton(parent: Instance, text: string, color: Color3, x: number): TextButton
+	local button = Instance.new("TextButton")
+	button.Size = UDim2.new(0.46, 0, 1, 0)
+	button.Position = UDim2.new(x, 0, 0, 0)
+	button.BackgroundColor3 = color
+	button.Text = text
+	button.Font = Enum.Font.GothamBold
+	button.TextSize = 20
+	button.TextColor3 = Color3.fromRGB(255, 255, 255)
+	button.AutoButtonColor = true
+	button.Parent = parent
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 10)
+	corner.Parent = button
+	return button
+end
+
+local function build()
+	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+
+	local screen = Instance.new("ScreenGui")
+	screen.Name = "SearchPanel"
+	screen.ResetOnSpawn = false
+	screen.Enabled = false
+	screen.Parent = playerGui
+	gui = screen
+
+	local panel = Instance.new("Frame")
+	panel.Size = UDim2.new(0, 460, 0, 260)
+	panel.Position = UDim2.new(0.5, -230, 0.5, -130)
+	panel.BackgroundColor3 = Color3.fromRGB(28, 32, 40)
+	panel.BorderSizePixel = 0
+	panel.Parent = screen
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 14)
+	corner.Parent = panel
+
+	local status = Instance.new("TextLabel")
+	status.BackgroundTransparency = 1
+	status.Size = UDim2.new(1, -32, 0, 44)
+	status.Position = UDim2.new(0, 16, 0, 14)
+	status.Font = Enum.Font.GothamBold
+	status.TextSize = 22
+	status.TextColor3 = Color3.fromRGB(240, 244, 250)
+	status.Text = ""
+	status.Parent = panel
+	statusLabel = status
+
+	local items = Instance.new("Frame")
+	items.BackgroundTransparency = 1
+	items.Size = UDim2.new(1, -40, 0, 110)
+	items.Position = UDim2.new(0, 20, 0, 64)
+	items.Parent = panel
+	itemsRow = items
+
+	local layout = Instance.new("UIListLayout")
+	layout.FillDirection = Enum.FillDirection.Horizontal
+	layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+	layout.VerticalAlignment = Enum.VerticalAlignment.Center
+	layout.Padding = UDim.new(0, 14)
+	layout.Parent = items
+
+	local buttons = Instance.new("Frame")
+	buttons.BackgroundTransparency = 1
+	buttons.Size = UDim2.new(1, -40, 0, 52)
+	buttons.Position = UDim2.new(0, 20, 1, -70)
+	buttons.Visible = false
+	buttons.Parent = panel
+	buttonsRow = buttons
+
+	local decision = Remotes.get("CheckDecision")
+
+	makeButton(buttons, "Arrest", Color3.fromRGB(196, 66, 58), 0).Activated:Connect(function()
+		if activeId then
+			decision:FireServer({ passengerId = activeId, detain = true })
+			SearchPanel.close()
+		end
+	end)
+	makeButton(buttons, "Let through", Color3.fromRGB(58, 130, 96), 0.54).Activated:Connect(function()
+		if activeId then
+			decision:FireServer({ passengerId = activeId, detain = false })
+			SearchPanel.close()
+		end
+	end)
+end
+
+local function clearItems()
+	if itemsRow then
+		for _, child in itemsRow:GetChildren() do
+			if child:IsA("Frame") then
+				child:Destroy()
+			end
+		end
+	end
+end
+
+local function showItems(items: { Types.ItemKind })
+	clearItems()
+	if not itemsRow then
+		return
+	end
+
+	local colors: { [string]: Color3 } = Config.ItemColors
+	for index, kind in items do
+		local cell = Instance.new("Frame")
+		cell.Size = UDim2.new(0, 96, 0, 96)
+		cell.BackgroundColor3 = Color3.fromRGB(44, 50, 60)
+		cell.BorderSizePixel = 0
+		cell.LayoutOrder = index
+		cell.Parent = itemsRow
+
+		local cellCorner = Instance.new("UICorner")
+		cellCorner.CornerRadius = UDim.new(0, 10)
+		cellCorner.Parent = cell
+
+		local shape = SHAPES[kind] or { size = UDim2.new(0.5, 0, 0.5, 0), corner = 6 }
+		local glyph = Instance.new("Frame")
+		glyph.Size = shape.size
+		glyph.AnchorPoint = Vector2.new(0.5, 0.5)
+		glyph.Position = UDim2.new(0.5, 0, 0.5, 0)
+		glyph.BackgroundColor3 = colors[kind] or Color3.fromRGB(200, 200, 200)
+		glyph.BorderSizePixel = 0
+		glyph.Parent = cell
+
+		local glyphCorner = Instance.new("UICorner")
+		glyphCorner.CornerRadius = UDim.new(0, shape.corner)
+		glyphCorner.Parent = glyph
+	end
+end
+
+local function stopCountdown()
+	if countdownConnection then
+		countdownConnection:Disconnect()
+		countdownConnection = nil
+	end
+end
+
+function SearchPanel.close()
+	stopCountdown()
+	activeId = nil
+	if gui then
+		gui.Enabled = false
+	end
+	if buttonsRow then
+		buttonsRow.Visible = false
+	end
+	clearItems()
+end
+
+local function onCheckStarted(payload: { passengerId: string, seconds: number })
+	activeId = payload.passengerId
+	countdownEndsAt = os.clock() + payload.seconds
+
+	clearItems()
+	if buttonsRow then
+		buttonsRow.Visible = false
+	end
+	if gui then
+		gui.Enabled = true
+	end
+
+	stopCountdown()
+	countdownConnection = RunService.RenderStepped:Connect(function()
+		local left = math.max(countdownEndsAt - os.clock(), 0)
+		if statusLabel then
+			statusLabel.Text = string.format("Checking… %.1fs", left)
+		end
+	end)
+end
+
+local function onCheckReady(payload: Types.CheckResult)
+	if payload.passengerId ~= activeId then
+		return
+	end
+	stopCountdown()
+	if statusLabel then
+		statusLabel.Text = "Carry-on contents"
+	end
+	showItems(payload.items)
+	if buttonsRow then
+		buttonsRow.Visible = true
+	end
+end
+
+function SearchPanel.start()
+	build()
+	Remotes.get("CheckStarted").OnClientEvent:Connect(onCheckStarted)
+	Remotes.get("CheckReady").OnClientEvent:Connect(onCheckReady)
+end
+
+return SearchPanel
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="27">
+          <Properties>
+            <string name="Name">Settings</string>
+            <string name="Source"><![CDATA[--!strict
+-- Настройки: громкость, коды, режим для слабых устройств.
+--
+-- Громкость и качество — целиком клиентские: они ни на что в игре не
+-- влияют и серверу о них знать незачем. Коды наоборот: клиент шлёт
+-- только строку, а список и решение живут на сервере.
+--
+-- Выбор запоминается в этом же сеансе. Постоянным станет вместе
+-- с сохранениями.
+
+local Lighting = game:GetService("Lighting")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local SoundService = game:GetService("SoundService")
+
+local PlotContext = require(ReplicatedStorage.Shared.PlotContext)
+local Remotes = require(ReplicatedStorage.Shared.Remotes)
+
+local Settings = {}
+
+local codeBox: TextBox? = nil
+local codeStatus: TextLabel? = nil
+
+local musicVolume = 0.5
+local soundVolume = 0.7
+local lowSpec = false
+
+-- Звуковые группы: создаём заранее, чтобы музыке и эффектам было куда
+-- попадать, когда они появятся.
+local function soundGroup(name: string): SoundGroup
+	local existing = SoundService:FindFirstChild(name)
+	if existing and existing:IsA("SoundGroup") then
+		return existing
+	end
+	local group = Instance.new("SoundGroup")
+	group.Name = name
+	group.Parent = SoundService
+	return group
+end
+
+local function applyVolumes()
+	soundGroup("Music").Volume = musicVolume
+	soundGroup("Effects").Volume = soundVolume
+end
+
+-- Что именно урезает облегчённый режим.
+--
+-- Главная тяжесть здесь — чужие аэропорты: их семь, и каждый со своей
+-- геометрией и людьми. Скрыть их — куда полезнее, чем крутить тени.
+local function applyLowSpec()
+	Lighting.GlobalShadows = not lowSpec
+
+	local plots = workspace:FindFirstChild("Plots")
+	if plots == nil then
+		return
+	end
+
+	local mine = if PlotContext.isActive() then PlotContext.origin() else nil
+	for _, plot in plots:GetChildren() do
+		local site = plot:FindFirstChild("Airport")
+		if site then
+			local ground = plot:FindFirstChild("Ground")
+			local isMine = typeof(mine) == "Vector3"
+				and ground
+				and ground:IsA("BasePart")
+				and (Vector3.new(ground.Position.X, 0, ground.Position.Z) - Vector3.new(mine.X, 0, mine.Z)).Magnitude < 1
+
+			for _, part in site:GetDescendants() do
+				if part:IsA("BasePart") then
+					part.LocalTransparencyModifier = if lowSpec and not isMine then 1 else 0
+				end
+			end
+		end
+	end
+end
+
+local function makeSlider(parent: Instance, label: string, y: number, initial: number, onChange: (number) -> ())
+	local caption = Instance.new("TextLabel")
+	caption.BackgroundTransparency = 1
+	caption.Size = UDim2.new(1, -32, 0, 24)
+	caption.Position = UDim2.new(0, 16, 0, y)
+	caption.Font = Enum.Font.GothamMedium
+	caption.TextSize = 15
+	caption.TextXAlignment = Enum.TextXAlignment.Left
+	caption.TextColor3 = Color3.fromRGB(220, 228, 240)
+	caption.Text = string.format("%s   %d%%", label, math.floor(initial * 100))
+	caption.Parent = parent
+
+	local track = Instance.new("Frame")
+	track.Size = UDim2.new(1, -32, 0, 10)
+	track.Position = UDim2.new(0, 16, 0, y + 28)
+	track.BackgroundColor3 = Color3.fromRGB(52, 60, 74)
+	track.BorderSizePixel = 0
+	track.Parent = parent
+
+	local trackCorner = Instance.new("UICorner")
+	trackCorner.CornerRadius = UDim.new(0, 5)
+	trackCorner.Parent = track
+
+	local fill = Instance.new("Frame")
+	fill.Size = UDim2.new(initial, 0, 1, 0)
+	fill.BackgroundColor3 = Color3.fromRGB(96, 186, 120)
+	fill.BorderSizePixel = 0
+	fill.Parent = track
+
+	local fillCorner = Instance.new("UICorner")
+	fillCorner.CornerRadius = UDim.new(0, 5)
+	fillCorner.Parent = fill
+
+	-- Ползунок сделан кнопкой во всю дорожку: нажатие ставит значение
+	-- по месту клика. Проще перетаскивания и работает на касании.
+	local hit = Instance.new("TextButton")
+	hit.Size = UDim2.new(1, 0, 1, 12)
+	hit.Position = UDim2.new(0, 0, 0, -6)
+	hit.BackgroundTransparency = 1
+	hit.Text = ""
+	hit.Parent = track
+
+	local function setFromX(x: number)
+		local ratio = math.clamp((x - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
+		fill.Size = UDim2.new(ratio, 0, 1, 0)
+		caption.Text = string.format("%s   %d%%", label, math.floor(ratio * 100))
+		onChange(ratio)
+	end
+
+	hit.MouseButton1Down:Connect(function(x: number)
+		setFromX(x)
+	end)
+end
+
+local function makeToggle(parent: Instance, label: string, y: number, onChange: (boolean) -> ()): TextButton
+	local button = Instance.new("TextButton")
+	button.Size = UDim2.new(1, -32, 0, 40)
+	button.Position = UDim2.new(0, 16, 0, y)
+	button.BackgroundColor3 = Color3.fromRGB(52, 60, 74)
+	button.Font = Enum.Font.GothamMedium
+	button.TextSize = 15
+	button.TextColor3 = Color3.fromRGB(220, 228, 240)
+	button.Text = label .. "   OFF"
+	button.BorderSizePixel = 0
+	button.AutoButtonColor = true
+	button.Parent = parent
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 8)
+	corner.Parent = button
+
+	local on = false
+	button.Activated:Connect(function()
+		on = not on
+		button.Text = label .. (if on then "   ON" else "   OFF")
+		button.BackgroundColor3 = if on
+			then Color3.fromRGB(52, 116, 92)
+			else Color3.fromRGB(52, 60, 74)
+		onChange(on)
+	end)
+	return button
+end
+
+local function build()
+	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+
+	local screen = Instance.new("ScreenGui")
+	screen.Name = "Settings"
+	screen.ResetOnSpawn = false
+	screen.IgnoreGuiInset = true
+	screen.DisplayOrder = 20
+	screen.Enabled = false
+	screen.Parent = playerGui
+
+	local shade = Instance.new("Frame")
+	shade.Size = UDim2.new(1, 0, 1, 0)
+	shade.BackgroundColor3 = Color3.fromRGB(10, 12, 18)
+	shade.BackgroundTransparency = 0.4
+	shade.BorderSizePixel = 0
+	shade.Parent = screen
+
+	local panel = Instance.new("Frame")
+	panel.Size = UDim2.new(0, 380, 0, 430)
+	panel.Position = UDim2.new(0.5, -190, 0.5, -215)
+	panel.BackgroundColor3 = Color3.fromRGB(24, 28, 36)
+	panel.BorderSizePixel = 0
+	panel.Parent = screen
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 14)
+	corner.Parent = panel
+
+	local title = Instance.new("TextLabel")
+	title.BackgroundTransparency = 1
+	title.Size = UDim2.new(1, 0, 0, 44)
+	title.Position = UDim2.new(0, 0, 0, 12)
+	title.Font = Enum.Font.GothamBold
+	title.TextSize = 24
+	title.TextColor3 = Color3.fromRGB(245, 250, 255)
+	title.Text = "Settings"
+	title.Parent = panel
+
+	makeSlider(panel, "Music", 66, musicVolume, function(value)
+		musicVolume = value
+		applyVolumes()
+	end)
+	makeSlider(panel, "Sound effects", 128, soundVolume, function(value)
+		soundVolume = value
+		applyVolumes()
+	end)
+
+	makeToggle(panel, "Low spec mode", 190, function(value)
+		lowSpec = value
+		applyLowSpec()
+	end)
+
+	-- Коды.
+	local codeCaption = Instance.new("TextLabel")
+	codeCaption.BackgroundTransparency = 1
+	codeCaption.Size = UDim2.new(1, -32, 0, 22)
+	codeCaption.Position = UDim2.new(0, 16, 0, 244)
+	codeCaption.Font = Enum.Font.GothamMedium
+	codeCaption.TextSize = 15
+	codeCaption.TextXAlignment = Enum.TextXAlignment.Left
+	codeCaption.TextColor3 = Color3.fromRGB(220, 228, 240)
+	codeCaption.Text = "Promo code"
+	codeCaption.Parent = panel
+
+	local box = Instance.new("TextBox")
+	box.Size = UDim2.new(1, -132, 0, 40)
+	box.Position = UDim2.new(0, 16, 0, 270)
+	box.BackgroundColor3 = Color3.fromRGB(40, 46, 58)
+	box.Font = Enum.Font.GothamMedium
+	box.TextSize = 16
+	box.TextColor3 = Color3.fromRGB(240, 246, 252)
+	box.PlaceholderText = "Enter code"
+	box.Text = ""
+	box.ClearTextOnFocus = false
+	box.BorderSizePixel = 0
+	box.Parent = panel
+	codeBox = box
+
+	local boxCorner = Instance.new("UICorner")
+	boxCorner.CornerRadius = UDim.new(0, 8)
+	boxCorner.Parent = box
+
+	local redeem = Instance.new("TextButton")
+	redeem.Size = UDim2.new(0, 100, 0, 40)
+	redeem.Position = UDim2.new(1, -116, 0, 270)
+	redeem.BackgroundColor3 = Color3.fromRGB(52, 116, 92)
+	redeem.Font = Enum.Font.GothamBold
+	redeem.TextSize = 16
+	redeem.TextColor3 = Color3.fromRGB(240, 250, 244)
+	redeem.Text = "Redeem"
+	redeem.BorderSizePixel = 0
+	redeem.Parent = panel
+
+	local redeemCorner = Instance.new("UICorner")
+	redeemCorner.CornerRadius = UDim.new(0, 8)
+	redeemCorner.Parent = redeem
+
+	local status = Instance.new("TextLabel")
+	status.BackgroundTransparency = 1
+	status.Size = UDim2.new(1, -32, 0, 40)
+	status.Position = UDim2.new(0, 16, 0, 314)
+	status.Font = Enum.Font.GothamMedium
+	status.TextSize = 15
+	status.TextWrapped = true
+	status.TextXAlignment = Enum.TextXAlignment.Left
+	status.TextColor3 = Color3.fromRGB(160, 170, 186)
+	status.Text = ""
+	status.Parent = panel
+	codeStatus = status
+
+	redeem.Activated:Connect(function()
+		if box.Text ~= "" then
+			Remotes.get("RedeemCode"):FireServer(box.Text)
+		end
+	end)
+
+	local close = Instance.new("TextButton")
+	close.Size = UDim2.new(1, -32, 0, 44)
+	close.Position = UDim2.new(0, 16, 1, -60)
+	close.BackgroundColor3 = Color3.fromRGB(52, 60, 74)
+	close.Font = Enum.Font.GothamBold
+	close.TextSize = 16
+	close.TextColor3 = Color3.fromRGB(230, 236, 244)
+	close.Text = "Close"
+	close.BorderSizePixel = 0
+	close.Parent = panel
+
+	local closeCorner = Instance.new("UICorner")
+	closeCorner.CornerRadius = UDim.new(0, 10)
+	closeCorner.Parent = close
+
+	close.Activated:Connect(function()
+		screen.Enabled = false
+	end)
+end
+
+local MESSAGES: { [string]: string } = {
+	Granted = "Code accepted",
+	Unknown = "No such code",
+	AlreadyUsed = "You already used this code",
+	Expired = "This code has expired",
+}
+
+function Settings.start()
+	build()
+	applyVolumes()
+
+	Remotes.get("CodeResult").OnClientEvent:Connect(function(payload)
+		local status = codeStatus
+		if status == nil then
+			return
+		end
+		local text = MESSAGES[payload.outcome] or "Something went wrong"
+		if payload.outcome == "Granted" and payload.money > 0 then
+			text = string.format("%s — $%d", text, payload.money)
+		end
+		status.Text = text
+		status.TextColor3 = if payload.outcome == "Granted"
+			then Color3.fromRGB(150, 235, 160)
+			else Color3.fromRGB(226, 150, 120)
+		if payload.outcome == "Granted" and codeBox then
+			codeBox.Text = ""
+		end
+	end)
+end
+
+return Settings
+]]></string>
+          </Properties>
+        </Item>
+        <Item class="ModuleScript" referent="28">
+          <Properties>
+            <string name="Name">Shop</string>
+            <string name="Source"><![CDATA[--!strict
+-- Кошелёк и магазин.
+--
+-- Магазин спрятан за кнопкой, но кошелёк виден всегда: без него не
+-- понять, к чему копишь. Кнопка подсвечивается, когда хватает хотя бы
+-- на одну покупку — так дальняя цель напоминает о себе, не занимая
+-- экран.
+--
+-- Две вкладки: улучшения действуют сразу и невидимы, оборудование —
+-- объекты, которые появляются в мире. Разделены потому, что это разные
+-- решения: одно про числа, другое про устройство пункта.
+--
+-- Покупку решает сервер. Отсюда уходит только идентификатор.
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Remotes = require(ReplicatedStorage.Shared.Remotes)
+
+local Shop = {}
+
+type Row = {
+	id: string,
+	displayName: string,
+	price: number,
+	owned: number,
+	maxCount: number,
+}
+
+local moneyLabel: TextLabel? = nil
+local openButton: TextButton? = nil
+local listFrame: Frame? = nil
+local emptyLabel: TextLabel? = nil
+local tabButtons: { [string]: TextButton } = {}
+
+local buttons: { [string]: TextButton? } = {}
+local wallet = 0
+local rows: { Row } = {}
+
+local ACCENT = Color3.fromRGB(52, 116, 92)
+local DIM = Color3.fromRGB(48, 54, 64)
+
+local function canAffordAny(): boolean
+	for _, row in rows do
+		if row.owned < row.maxCount and wallet >= row.price then
+			return true
+		end
+	end
+	return false
+end
+
+local function refresh()
+	if moneyLabel then
+		moneyLabel.Text = string.format("$ %d", wallet)
+	end
+
+	-- Кнопка подсвечивается, когда есть что купить: напоминание
+	-- без занятого экрана.
+	if openButton then
+		local ready = canAffordAny()
+		openButton.BackgroundColor3 = if ready then ACCENT else DIM
+		openButton.TextColor3 = if ready
+			then Color3.fromRGB(240, 250, 244)
+			else Color3.fromRGB(170, 178, 190)
+	end
+
+	for _, row in rows do
+		local button = buttons[row.id]
+		if button then
+			local maxed = row.owned >= row.maxCount
+			local affordable = wallet >= row.price
+
+			button.Text = if maxed
+				then string.format("%s   MAX", row.displayName)
+				else string.format("%s  lv%d   $%d", row.displayName, row.owned, row.price)
+
+			button.BackgroundColor3 = if maxed
+				then Color3.fromRGB(58, 66, 78)
+				elseif affordable then ACCENT
+				else DIM
+			button.TextColor3 = if affordable and not maxed
+				then Color3.fromRGB(240, 250, 244)
+				else Color3.fromRGB(150, 158, 172)
+		end
+	end
+end
+
+local function setTab(tab: string)
+	for name, button in tabButtons do
+		local on = name == tab
+		button.BackgroundColor3 = if on then Color3.fromRGB(64, 72, 86) else Color3.fromRGB(40, 46, 56)
+		button.TextColor3 = if on then Color3.fromRGB(240, 246, 252) else Color3.fromRGB(150, 158, 172)
+	end
+
+	local showUpgrades = tab == "Upgrades"
+	if listFrame then
+		listFrame.Visible = showUpgrades
+	end
+	if emptyLabel then
+		emptyLabel.Visible = not showUpgrades
+	end
+end
+
+local function makeTab(parent: Instance, name: string, text: string, x: number)
+	local button = Instance.new("TextButton")
+	button.Size = UDim2.new(0.5, -4, 0, 34)
+	button.Position = UDim2.new(x, if x == 0 then 0 else 4, 0, 0)
+	button.Font = Enum.Font.GothamMedium
+	button.TextSize = 15
+	button.Text = text
+	button.BorderSizePixel = 0
+	button.AutoButtonColor = false
+	button.Parent = parent
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 8)
+	corner.Parent = button
+
+	button.Activated:Connect(function()
+		setTab(name)
+	end)
+	tabButtons[name] = button
+end
+
+local function build()
+	local playerGui = Players.LocalPlayer:WaitForChild("PlayerGui")
+
+	local gui = Instance.new("ScreenGui")
+	gui.Name = "Shop"
+	gui.ResetOnSpawn = false
+	gui.Parent = playerGui
+
+	local money = Instance.new("TextLabel")
+	money.BackgroundTransparency = 1
+	money.Size = UDim2.new(0, 240, 0, 40)
+	money.Position = UDim2.new(1, -264, 0, 14)
+	money.Font = Enum.Font.GothamBold
+	money.TextSize = 30
+	money.TextXAlignment = Enum.TextXAlignment.Right
+	money.TextColor3 = Color3.fromRGB(240, 226, 150)
+	money.TextStrokeTransparency = 0.4
+	money.Text = "$ 0"
+	money.Parent = gui
+	moneyLabel = money
+
+	local open = Instance.new("TextButton")
+	open.Size = UDim2.new(0, 120, 0, 36)
+	open.Position = UDim2.new(1, -144, 0, 58)
+	open.Font = Enum.Font.GothamBold
+	open.TextSize = 16
+	open.Text = "Shop"
+	open.BorderSizePixel = 0
+	open.AutoButtonColor = true
+	open.Parent = gui
+	openButton = open
+
+	local openCorner = Instance.new("UICorner")
+	openCorner.CornerRadius = UDim.new(0, 8)
+	openCorner.Parent = open
+
+	local board = Instance.new("Frame")
+	board.Size = UDim2.new(0, 300, 0, 290)
+	board.Position = UDim2.new(1, -324, 0, 102)
+	board.BackgroundColor3 = Color3.fromRGB(28, 32, 40)
+	board.BorderSizePixel = 0
+	board.Visible = false
+	board.Parent = gui
+
+	local boardCorner = Instance.new("UICorner")
+	boardCorner.CornerRadius = UDim.new(0, 12)
+	boardCorner.Parent = board
+
+	local tabs = Instance.new("Frame")
+	tabs.BackgroundTransparency = 1
+	tabs.Size = UDim2.new(1, -24, 0, 34)
+	tabs.Position = UDim2.new(0, 12, 0, 12)
+	tabs.Parent = board
+
+	makeTab(tabs, "Upgrades", "Upgrades", 0)
+	makeTab(tabs, "Equipment", "Equipment", 0.5)
+
+	local list = Instance.new("Frame")
+	list.BackgroundTransparency = 1
+	list.Size = UDim2.new(1, -24, 1, -66)
+	list.Position = UDim2.new(0, 12, 0, 56)
+	list.Parent = board
+	listFrame = list
+
+	local layout = Instance.new("UIListLayout")
+	layout.FillDirection = Enum.FillDirection.Vertical
+	layout.Padding = UDim.new(0, 8)
+	layout.Parent = list
+
+	local empty = Instance.new("TextLabel")
+	empty.BackgroundTransparency = 1
+	empty.Size = UDim2.new(1, -24, 1, -66)
+	empty.Position = UDim2.new(0, 12, 0, 56)
+	empty.Font = Enum.Font.Gotham
+	empty.TextSize = 15
+	empty.TextWrapped = true
+	empty.TextColor3 = Color3.fromRGB(150, 158, 172)
+	empty.Text = "Extra lanes, checkpoints and helpers arrive here soon."
+	empty.Visible = false
+	empty.Parent = board
+	emptyLabel = empty
+
+	open.Activated:Connect(function()
+		board.Visible = not board.Visible
+	end)
+
+	setTab("Upgrades")
+end
+
+local function rebuildButtons()
+	local list = listFrame
+	if list == nil then
+		return
+	end
+
+	local buy = Remotes.get("BuyUpgrade")
+	for index, row in rows do
+		if buttons[row.id] ~= nil then
+			continue
+		end
+
+		local button = Instance.new("TextButton")
+		button.Size = UDim2.new(1, 0, 0, 40)
+		button.LayoutOrder = index
+		button.Font = Enum.Font.GothamMedium
+		button.TextSize = 15
+		button.AutoButtonColor = true
+		button.BorderSizePixel = 0
+		button.Text = ""
+		button.Parent = list
+
+		local corner = Instance.new("UICorner")
+		corner.CornerRadius = UDim.new(0, 8)
+		corner.Parent = button
+
+		local id = row.id
+		button.Activated:Connect(function()
+			buy:FireServer(id)
+		end)
+
+		buttons[row.id] = button
+	end
+end
+
+function Shop.start()
+	build()
+
+	Remotes.get("WalletChanged").OnClientEvent:Connect(function(amount: number)
+		wallet = amount
+		refresh()
+	end)
+
+	Remotes.get("ShopChanged").OnClientEvent:Connect(function(state: { Row })
+		rows = state
+		rebuildButtons()
+		refresh()
+	end)
+end
+
+return Shop
+]]></string>
+          </Properties>
+        </Item>
+      </Item>
+    </Item>
+  </Item>
+</roblox>
